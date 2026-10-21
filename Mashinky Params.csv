@@ -1,0 +1,17 @@
+"Token","Output/yr","Token Cost Adj.","Normalized",
+"Cash",1000,"=IFERROR(R8C2/RC[-1], 100)","=RC[-1]/R2C[-1]",
+"Coal",540,"=IFERROR(R8C2/RC[-1], 100)","=RC[-1]/R2C[-1]",
+"Diesel",224,"=IFERROR(R8C2/RC[-1], 100)","=RC[-1]/R2C[-1]",
+"Electric",0,"=IFERROR(R8C2/RC[-1],2)","=RC[-1]/R2C[-1]",
+,,,,
+,,,,
+"fuel per year","=R12C2/5",,,
+"time_speed",0.33,"days/second",,
+"tick rate",0.1,"ticks/second",,
+"year length",365,"days","=R11C2/R9C2","second"
+"ticks per year","=R10C2*R11C4",,,
+"adj scaling factor",1000,,,
+"fixed scaling factor",1000,1000,1000,1000
+,,,,
+"km/mi",1.609344,,,
+"traction scale",42.1,"t/(hp hr/km)","converts tractive effort (P/v) to towage (t)",
