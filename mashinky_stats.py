@@ -66,7 +66,7 @@ def parse_eras(raw_epoch):
 				t_eras[e] = e
 	return "".join([str(e) for e in t_eras if e]) or '0'
 
-def all_stats(vehicle, filename):
+def all_stats(vehicle, filename = None, vanilla = None):
 	try:
 		power = float(vehicle.get('power', 0))
 		max_speed = float(vehicle.get('max_speed', 0))
@@ -105,7 +105,7 @@ def all_stats(vehicle, filename):
 		
 		def TP_c(c, t):
 			return (t/(cost.get(c, 0)*fixed_scale[c]) if power and cost.get(c)
-				else "")
+				else 0.)
 		TP = lambda c: TP_c(c, throughput)
 		TPc = lambda c: TP_c(c, cargo_throughput)
 		TPp = lambda c: TP_c(c, profit_throughput)
@@ -117,7 +117,8 @@ def all_stats(vehicle, filename):
 			# technical info
 			C.ID: str(vehicle[C.ID]),
 			C.CID: str(vehicle.get('cargo', "")),
-			C.SOURCE: str(filename),
+			C.SOURCE: str(filename) if filename is not None else vehicle[C.SOURCE],
+			C.VANILLA: vanilla if vanilla is not None else vehicle.get(C.VANILLA, False),
 			
 			# common
 			C.NAME: str(vehicle['name'].rstrip()),
@@ -137,7 +138,7 @@ def all_stats(vehicle, filename):
 			C.TRACTION: traction,
 			C.TOWAGE: towage,
 			C.THROUGHPUT: throughput,
-			C.PWT_FULL: power/traction if traction != 0 else 0,
+			C.PWT_FULL: power/traction if traction != 0 else 0.,
 			C.PWT_EMPTY: power/weight_full,
 			C.TOW_PER_LENGTH: towage/length,
 			C.POWER_PER_LENGTH: power/length,
@@ -158,10 +159,10 @@ def all_stats(vehicle, filename):
 			
 			# fuel
 			C.ADJCOST: adjcost,
-			C.CASH: cost.get(C.CASH, 0),
-			C.COAL: cost.get(C.COAL, 0),
-			C.DIESEL: cost.get(C.DIESEL, 0),
-			C.ELECTRIC: cost.get(C.ELECTRIC, 0),
+			C.CASH: cost.get(C.CASH, 0.),
+			C.COAL: cost.get(C.COAL, 0.),
+			C.DIESEL: cost.get(C.DIESEL, 0.),
+			C.ELECTRIC: cost.get(C.ELECTRIC, 0.),
 			
 			C.TP_ADJCOST: adjcost and throughput/(adjcost*adj_scale),
 			C.TP_CASH: TP(C.CASH),
@@ -189,10 +190,10 @@ def all_stats(vehicle, filename):
 			C.COMPOUND_EFFICIENCY: (capacity/length)*(10*capacity/weight_full),
 			C.COMPOUND_PROFITABILITY: (profit/length)*(10*profit/weight_full),
 			C.DENSITY: weight_full/length,
-			C.WT_PER_CARGO: weight_full/capacity if capacity != 0 else 0,
+			C.WT_PER_CARGO: weight_full/capacity if capacity != 0 else 0.,
 			C.CARGO_UNIT_WT: (
 				(weight_full-weight_empty)/capacity if capacity != 0
-				else 0),
+				else 0.),
 		}
 	except Exception as e:
 		e.add_note(f"ID: {vehicle.get(C.ID)}, source: {filename}")
@@ -207,10 +208,11 @@ def filter_row(vehicle, fields):
 		raise
 
 # This is bad but it's the least repetitive way without rewriting quite a bit
-all_labels = list(all_stats({
-	C.ID: '0', 'vehicle_type': '0', 'name': '', 'weight_full': 1,
-	'weight_empty': 1, 'epoch': '0', 'length': 1
-}, ''))
+null_row = all_stats({
+C.ID: '0', 'vehicle_type': '0', 'name': '', 'weight_full': 1.,
+'weight_empty': 1., 'epoch': '0', 'length': 1.
+}, '')
+all_labels = list(null_row)
 
 train_direct_labels = [
 	C.NAME, C.SPEED, C.TRACTION, C.POWER, C.WEIGHT, C.LENGTH, C.ERA
@@ -367,13 +369,20 @@ def compare_wagon(vehicle, expected, out):
 			l=rnd(t[C.LENGTH]), b=rnd(t[C.BONUS]), p=rnd(t.get(C.POWER)))
 	return compare_vehicle(vehicle, expected, 'wagon', elem(wagon_row_labels), wagon_direct_labels, fmt, out)
 
-def read_files(files):
-	out = []
-	for file in files:
-		dom = BeautifulSoup(slurp(file), "lxml")
-		for tag in dom.find_all('wagontype'):
-			out.append(all_stats(tag.attrs, file))
-	return out
+def read_files(files, vfiles):
+	idx = 0
+	def impl(files, vanilla):
+		nonlocal idx
+		out = []
+		for file in files:
+			dom = BeautifulSoup(slurp(file), "lxml")
+			for tag in dom.find_all('wagontype'):
+				row = all_stats(tag.attrs, file, vanilla)
+				row['index'] = idx
+				idx = idx + 1
+				out.append(row)
+		return out
+	return impl(vfiles, True) + impl(files, False)
 
 
 def process_files(table, out, msg, fields, pred, exp, comp, exp_out):
@@ -417,8 +426,8 @@ def filter_vehicle(a):
 def filter_aircraft(a):
 	return int(a['vehicle_type']) == 3
 
-def run(files, train_out, wagon_out, vehicle_out, aircraft_out, univ_out, expected_trains, expected_wagons, unexpected_outstream):
-	table = read_files(files)
+def run(files, vfiles, train_out, wagon_out, vehicle_out, aircraft_out, univ_out, expected_trains, expected_wagons, unexpected_outstream):
+	table = read_files(files, vfiles)
 
 	process_files(table, train_out, "Trains:", train_row_labels,
 		filter_engine,
@@ -447,6 +456,10 @@ def make_arg_parser(gui):
 		help='Paths to individual xml files to parse')
 	parser.add_argument('-p', '--path', action='append', default=[],
 		help='Path(s) to mods root directory')
+	parser.add_argument('-V', '--vanilla', action='append', default=[],
+		help="Path(s) to individual files for vanilla trains")
+	parser.add_argument('-P', '--vanilla_dir', action='append', default=[],
+		help="Path(s) to individual files for vanilla trains")
 	parser.add_argument('-T', '--expected_trains')
 	parser.add_argument('-W', '--expected_wagons')
 	parser.add_argument('-i', '--income')
@@ -459,6 +472,7 @@ def make_arg_parser(gui):
 		parser.add_argument('-a', '--aircraft_out', default='-')
 		parser.add_argument('-u', '--univ_out')
 		parser.add_argument('-d', '--unexpected_out', default='-')
+	parser.add_argument('--props', default=None)
 	return parser
 
 def find_files(files, paths):
@@ -487,19 +501,50 @@ def read_incomes(income):
 		raise ValueError("Could not parse --income argument: "
 			+ repr(income))
 
+def generate_props(props):
+	with open(props, 'w') as p:
+		lookup = {str(v): k for k, v in C.__dict__.items()}
+		fix = lambda s, n: 'C.' + n if n is not None else repr(s)
+		print("""from dataclasses import dataclass
+from enum import Enum, auto
+import constants as C
+
+class Highlight(Enum):
+	NONE = auto()
+	HIGH = auto()
+	LOW = auto()
+	PARITY = auto()
+
+@dataclass(kw_only=True, frozen=True)
+class ColProps:
+	type: type
+	highlight: Highlight = Highlight.NONE
+	generated: bool = True
+	hidden: bool = False
+
+""", end='', file=p)
+		print('props = {', file=p)
+		for c, d in ({'index': 0} | null_row).items():
+			print(f"\t{fix(c, lookup.get(c, None))}: ColProps(type={type(d).__name__}),", file=p)
+		print('}', file=p)
 
 def handle_cli(gui):
 	warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 	parser = make_arg_parser(gui)
 	args = parser.parse_args()
 	files = find_files(args.files, args.path)
+	vfiles = find_files(args.vanilla, args.vanilla_dir)
 
 	if args.income:
 		read_incomes(args.income)
-	return args, files
+
+	if args.props:
+		generate_props(args.props)
+
+	return args, files, vfiles
 
 def main():
-	args, files = handle_cli(False)
+	args, files, vfiles = handle_cli(False)
 	with (sys.stdout
 	      if args.unexpected_out == '-'
 			else open(args.unexpected_out, 'w', newline='')
@@ -507,7 +552,7 @@ def main():
 		expected_trains = read_expected(args.expected_trains)
 		expected_wagons = read_expected(args.expected_wagons)
 		
-		run(files, args.train_out, args.wagon_out, args.vehicle_out, args.aircraft_out, args.univ_out, expected_trains, expected_wagons, unexpected_outstream)
+		run(files, vfiles, args.train_out, args.wagon_out, args.vehicle_out, args.aircraft_out, args.univ_out, expected_trains, expected_wagons, unexpected_outstream)
 	
 if __name__ == '__main__':
 	main()

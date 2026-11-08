@@ -16,11 +16,12 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
     QIcon, QImage, QKeySequence, QLinearGradient,
     QPainter, QPalette, QPixmap, QRadialGradient,
     QTransform)
-from PySide6.QtWidgets import (QApplication, QComboBox, QFormLayout, QGridLayout,
-    QGroupBox, QHeaderView, QLabel, QLineEdit,
-    QMainWindow, QMenu, QMenuBar, QSizePolicy,
-    QSpinBox, QStatusBar, QTabWidget, QTableWidget,
-    QTableWidgetItem, QWidget)
+from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QComboBox, QFormLayout,
+    QFrame, QGridLayout, QGroupBox, QHeaderView,
+    QLabel, QLineEdit, QMainWindow, QMenu,
+    QMenuBar, QSizePolicy, QSpacerItem, QSpinBox,
+    QStatusBar, QTabWidget, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -49,10 +50,31 @@ class Ui_MainWindow(object):
         self.actionQuit.setIcon(icon1)
         self.actionMods = QAction(MainWindow)
         self.actionMods.setObjectName(u"actionMods")
+        self.actionHelp = QAction(MainWindow)
+        self.actionHelp.setObjectName(u"actionHelp")
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout_2 = QGridLayout(self.centralwidget)
         self.gridLayout_2.setObjectName(u"gridLayout_2")
+        self.frame = QFrame(self.centralwidget)
+        self.frame.setObjectName(u"frame")
+        self.frame.setFrameShape(QFrame.NoFrame)
+        self.frame.setFrameShadow(QFrame.Plain)
+        self.gridLayout_9 = QGridLayout(self.frame)
+        self.gridLayout_9.setObjectName(u"gridLayout_9")
+        self.lineEdit_search = QLineEdit(self.frame)
+        self.lineEdit_search.setObjectName(u"lineEdit_search")
+
+        self.gridLayout_9.addWidget(self.lineEdit_search, 1, 1, 1, 1)
+
+        self.label_search = QLabel(self.frame)
+        self.label_search.setObjectName(u"label_search")
+
+        self.gridLayout_9.addWidget(self.label_search, 1, 0, 1, 1)
+
+
+        self.gridLayout_2.addWidget(self.frame, 1, 0, 1, 1)
+
         self.tabWidget = QTabWidget(self.centralwidget)
         self.tabWidget.setObjectName(u"tabWidget")
         sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -69,6 +91,9 @@ class Ui_MainWindow(object):
         self.gridLayout.setObjectName(u"gridLayout")
         self.tbl_engines = QTableWidget(self.tab_engines)
         self.tbl_engines.setObjectName(u"tbl_engines")
+        self.tbl_engines.setAlternatingRowColors(True)
+        self.tbl_engines.setCornerButtonEnabled(False)
+        self.tbl_engines.horizontalHeader().setMinimumSectionSize(16)
         self.tbl_engines.horizontalHeader().setProperty(u"showSortIndicator", True)
         self.tbl_engines.verticalHeader().setProperty(u"showSortIndicator", False)
 
@@ -80,15 +105,10 @@ class Ui_MainWindow(object):
         self.gridLayout_3 = QGridLayout(self.tab_wagons)
         self.gridLayout_3.setObjectName(u"gridLayout_3")
         self.tbl_wagons = QTableWidget(self.tab_wagons)
-        if (self.tbl_wagons.columnCount() < 3):
-            self.tbl_wagons.setColumnCount(3)
-        __qtablewidgetitem = QTableWidgetItem()
-        self.tbl_wagons.setHorizontalHeaderItem(0, __qtablewidgetitem)
-        __qtablewidgetitem1 = QTableWidgetItem()
-        self.tbl_wagons.setHorizontalHeaderItem(1, __qtablewidgetitem1)
-        __qtablewidgetitem2 = QTableWidgetItem()
-        self.tbl_wagons.setHorizontalHeaderItem(2, __qtablewidgetitem2)
         self.tbl_wagons.setObjectName(u"tbl_wagons")
+        self.tbl_wagons.setAlternatingRowColors(True)
+        self.tbl_wagons.setCornerButtonEnabled(False)
+        self.tbl_wagons.horizontalHeader().setMinimumSectionSize(16)
         self.tbl_wagons.horizontalHeader().setProperty(u"showSortIndicator", True)
 
         self.gridLayout_3.addWidget(self.tbl_wagons, 0, 0, 1, 1)
@@ -100,6 +120,9 @@ class Ui_MainWindow(object):
         self.gridLayout_4.setObjectName(u"gridLayout_4")
         self.tbl_vehicles = QTableWidget(self.tab_vehicles)
         self.tbl_vehicles.setObjectName(u"tbl_vehicles")
+        self.tbl_vehicles.setAlternatingRowColors(True)
+        self.tbl_vehicles.setCornerButtonEnabled(False)
+        self.tbl_vehicles.horizontalHeader().setMinimumSectionSize(16)
         self.tbl_vehicles.horizontalHeader().setProperty(u"showSortIndicator", True)
 
         self.gridLayout_4.addWidget(self.tbl_vehicles, 0, 0, 1, 1)
@@ -111,6 +134,9 @@ class Ui_MainWindow(object):
         self.gridLayout_5.setObjectName(u"gridLayout_5")
         self.tbl_aircraft = QTableWidget(self.tab_aircraft)
         self.tbl_aircraft.setObjectName(u"tbl_aircraft")
+        self.tbl_aircraft.setAlternatingRowColors(True)
+        self.tbl_aircraft.setCornerButtonEnabled(False)
+        self.tbl_aircraft.horizontalHeader().setMinimumSectionSize(16)
         self.tbl_aircraft.horizontalHeader().setProperty(u"showSortIndicator", True)
 
         self.gridLayout_5.addWidget(self.tbl_aircraft, 0, 0, 1, 1)
@@ -122,6 +148,9 @@ class Ui_MainWindow(object):
         self.gridLayout_8.setObjectName(u"gridLayout_8")
         self.tbl_all = QTableWidget(self.tab_all)
         self.tbl_all.setObjectName(u"tbl_all")
+        self.tbl_all.setAlternatingRowColors(True)
+        self.tbl_all.setCornerButtonEnabled(False)
+        self.tbl_all.horizontalHeader().setMinimumSectionSize(16)
         self.tbl_all.horizontalHeader().setProperty(u"showSortIndicator", True)
 
         self.gridLayout_8.addWidget(self.tbl_all, 0, 0, 1, 1)
@@ -129,33 +158,61 @@ class Ui_MainWindow(object):
         self.tabWidget.addTab(self.tab_all, "")
         self.tab_prefs = QWidget()
         self.tab_prefs.setObjectName(u"tab_prefs")
+        self.verticalLayout = QVBoxLayout(self.tab_prefs)
+        self.verticalLayout.setObjectName(u"verticalLayout")
         self.groupBox_tokens = QGroupBox(self.tab_prefs)
         self.groupBox_tokens.setObjectName(u"groupBox_tokens")
-        self.groupBox_tokens.setGeometry(QRect(9, 9, 281, 93))
         sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         sizePolicy1.setHorizontalStretch(0)
         sizePolicy1.setVerticalStretch(0)
         sizePolicy1.setHeightForWidth(self.groupBox_tokens.sizePolicy().hasHeightForWidth())
         self.groupBox_tokens.setSizePolicy(sizePolicy1)
+        self.groupBox_tokens.setMaximumSize(QSize(16777215, 16777215))
+        self.groupBox_tokens.setFlat(True)
+        self.groupBox_tokens.setCheckable(False)
         self.gridLayout_6 = QGridLayout(self.groupBox_tokens)
         self.gridLayout_6.setObjectName(u"gridLayout_6")
+        self.label_coal = QLabel(self.groupBox_tokens)
+        self.label_coal.setObjectName(u"label_coal")
+
+        self.gridLayout_6.addWidget(self.label_coal, 1, 1, 1, 1)
+
         self.amt_electricity = QSpinBox(self.groupBox_tokens)
         self.amt_electricity.setObjectName(u"amt_electricity")
         self.amt_electricity.setMaximum(10000)
         self.amt_electricity.setSingleStep(10)
+        self.amt_electricity.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType)
         self.amt_electricity.setValue(250)
 
         self.gridLayout_6.addWidget(self.amt_electricity, 2, 3, 1, 1)
+
+        self.label_cash = QLabel(self.groupBox_tokens)
+        self.label_cash.setObjectName(u"label_cash")
+
+        self.gridLayout_6.addWidget(self.label_cash, 1, 0, 1, 1)
+
+        self.amt_coal = QSpinBox(self.groupBox_tokens)
+        self.amt_coal.setObjectName(u"amt_coal")
+        self.amt_coal.setMaximum(10000)
+        self.amt_coal.setSingleStep(10)
+        self.amt_coal.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType)
+        self.amt_coal.setValue(500)
+
+        self.gridLayout_6.addWidget(self.amt_coal, 2, 1, 1, 1)
 
         self.label_electricity = QLabel(self.groupBox_tokens)
         self.label_electricity.setObjectName(u"label_electricity")
 
         self.gridLayout_6.addWidget(self.label_electricity, 1, 3, 1, 1)
 
-        self.label_coal = QLabel(self.groupBox_tokens)
-        self.label_coal.setObjectName(u"label_coal")
+        self.amt_diesel = QSpinBox(self.groupBox_tokens)
+        self.amt_diesel.setObjectName(u"amt_diesel")
+        self.amt_diesel.setMaximum(10000)
+        self.amt_diesel.setSingleStep(10)
+        self.amt_diesel.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType)
+        self.amt_diesel.setValue(250)
 
-        self.gridLayout_6.addWidget(self.label_coal, 1, 1, 1, 1)
+        self.gridLayout_6.addWidget(self.amt_diesel, 2, 2, 1, 1)
 
         self.label_diesel = QLabel(self.groupBox_tokens)
         self.label_diesel.setObjectName(u"label_diesel")
@@ -167,39 +224,25 @@ class Ui_MainWindow(object):
         self.amt_cash.setFrame(True)
         self.amt_cash.setMaximum(10000)
         self.amt_cash.setSingleStep(10)
+        self.amt_cash.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType)
         self.amt_cash.setValue(1000)
 
         self.gridLayout_6.addWidget(self.amt_cash, 2, 0, 1, 1, Qt.AlignTop)
 
-        self.amt_coal = QSpinBox(self.groupBox_tokens)
-        self.amt_coal.setObjectName(u"amt_coal")
-        self.amt_coal.setMaximum(10000)
-        self.amt_coal.setSingleStep(10)
-        self.amt_coal.setValue(500)
+        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
-        self.gridLayout_6.addWidget(self.amt_coal, 2, 1, 1, 1)
+        self.gridLayout_6.addItem(self.horizontalSpacer, 2, 4, 1, 1)
 
-        self.amt_diesel = QSpinBox(self.groupBox_tokens)
-        self.amt_diesel.setObjectName(u"amt_diesel")
-        self.amt_diesel.setMaximum(10000)
-        self.amt_diesel.setSingleStep(10)
-        self.amt_diesel.setValue(250)
 
-        self.gridLayout_6.addWidget(self.amt_diesel, 2, 2, 1, 1)
-
-        self.label_cash = QLabel(self.groupBox_tokens)
-        self.label_cash.setObjectName(u"label_cash")
-
-        self.gridLayout_6.addWidget(self.label_cash, 1, 0, 1, 1)
+        self.verticalLayout.addWidget(self.groupBox_tokens)
 
         self.groupBox_display = QGroupBox(self.tab_prefs)
         self.groupBox_display.setObjectName(u"groupBox_display")
-        self.groupBox_display.setGeometry(QRect(10, 110, 281, 151))
         sizePolicy1.setHeightForWidth(self.groupBox_display.sizePolicy().hasHeightForWidth())
         self.groupBox_display.setSizePolicy(sizePolicy1)
         self.groupBox_display.setMaximumSize(QSize(16777215, 151))
         self.groupBox_display.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
-        self.groupBox_display.setFlat(False)
+        self.groupBox_display.setFlat(True)
         self.groupBox_display.setCheckable(False)
         self.formLayout = QFormLayout(self.groupBox_display)
         self.formLayout.setObjectName(u"formLayout")
@@ -239,35 +282,81 @@ class Ui_MainWindow(object):
 
         self.formLayout.setWidget(3, QFormLayout.ItemRole.LabelRole, self.sel_cmap)
 
+
+        self.verticalLayout.addWidget(self.groupBox_display)
+
         self.groupBox = QGroupBox(self.tab_prefs)
         self.groupBox.setObjectName(u"groupBox")
-        self.groupBox.setGeometry(QRect(10, 270, 281, 151))
+        self.groupBox.setFlat(True)
         self.gridLayout_7 = QGridLayout(self.groupBox)
         self.gridLayout_7.setObjectName(u"gridLayout_7")
-        self.label_moddir = QLabel(self.groupBox)
-        self.label_moddir.setObjectName(u"label_moddir")
+        self.lineEdit_vdir = QLineEdit(self.groupBox)
+        self.lineEdit_vdir.setObjectName(u"lineEdit_vdir")
+        self.lineEdit_vdir.setReadOnly(True)
 
-        self.gridLayout_7.addWidget(self.label_moddir, 0, 0, 1, 1)
-
-        self.lineEdit_others = QLineEdit(self.groupBox)
-        self.lineEdit_others.setObjectName(u"lineEdit_others")
-
-        self.gridLayout_7.addWidget(self.lineEdit_others, 3, 0, 1, 1)
+        self.gridLayout_7.addWidget(self.lineEdit_vdir, 5, 0, 1, 1)
 
         self.lineEdit_moddir = QLineEdit(self.groupBox)
         self.lineEdit_moddir.setObjectName(u"lineEdit_moddir")
-        self.lineEdit_moddir.setReadOnly(False)
+        self.lineEdit_moddir.setReadOnly(True)
 
         self.gridLayout_7.addWidget(self.lineEdit_moddir, 1, 0, 1, 1)
+
+        self.label_vdir = QLabel(self.groupBox)
+        self.label_vdir.setObjectName(u"label_vdir")
+
+        self.gridLayout_7.addWidget(self.label_vdir, 4, 0, 1, 1)
+
+        self.lineEdit_others = QLineEdit(self.groupBox)
+        self.lineEdit_others.setObjectName(u"lineEdit_others")
+        self.lineEdit_others.setReadOnly(True)
+
+        self.gridLayout_7.addWidget(self.lineEdit_others, 3, 0, 1, 1)
 
         self.label_others = QLabel(self.groupBox)
         self.label_others.setObjectName(u"label_others")
 
         self.gridLayout_7.addWidget(self.label_others, 2, 0, 1, 1)
 
+        self.label_moddir = QLabel(self.groupBox)
+        self.label_moddir.setObjectName(u"label_moddir")
+
+        self.gridLayout_7.addWidget(self.label_moddir, 0, 0, 1, 1)
+
+        self.label_vfiles = QLabel(self.groupBox)
+        self.label_vfiles.setObjectName(u"label_vfiles")
+
+        self.gridLayout_7.addWidget(self.label_vfiles, 6, 0, 1, 1)
+
+        self.lineEdit_vfiles = QLineEdit(self.groupBox)
+        self.lineEdit_vfiles.setObjectName(u"lineEdit_vfiles")
+        self.lineEdit_vfiles.setReadOnly(True)
+
+        self.gridLayout_7.addWidget(self.lineEdit_vfiles, 7, 0, 1, 1)
+
+
+        self.verticalLayout.addWidget(self.groupBox)
+
+        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.verticalLayout.addItem(self.verticalSpacer)
+
         self.tabWidget.addTab(self.tab_prefs, "")
 
         self.gridLayout_2.addWidget(self.tabWidget, 0, 0, 1, 1)
+
+        self.label = QLabel(self.centralwidget)
+        self.label.setObjectName(u"label")
+        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        sizePolicy3.setHorizontalStretch(100)
+        sizePolicy3.setVerticalStretch(0)
+        sizePolicy3.setHeightForWidth(self.label.sizePolicy().hasHeightForWidth())
+        self.label.setSizePolicy(sizePolicy3)
+        self.label.setMinimumSize(QSize(0, 24))
+        self.label.setFrameShape(QFrame.Panel)
+        self.label.setFrameShadow(QFrame.Sunken)
+
+        self.gridLayout_2.addWidget(self.label, 4, 0, 1, 1)
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
@@ -290,12 +379,12 @@ class Ui_MainWindow(object):
         self.actionQuit.triggered.connect(MainWindow.close)
         self.actionOpen.triggered.connect(MainWindow.open)
         self.actionMods.triggered.connect(MainWindow.open)
-        self.amt_cash.valueChanged.connect(MainWindow.set_cash)
         self.amt_coal.valueChanged.connect(MainWindow.set_coal)
-        self.amt_diesel.valueChanged.connect(MainWindow.set_diesel)
-        self.amt_electricity.valueChanged.connect(MainWindow.set_electricity)
         self.sel_unit.currentIndexChanged.connect(MainWindow.set_disp_unit)
+        self.amt_cash.valueChanged.connect(MainWindow.set_cash)
+        self.amt_diesel.valueChanged.connect(MainWindow.set_diesel)
         self.sel_cmap.currentIndexChanged.connect(MainWindow.set_disp_cmap)
+        self.amt_electricity.valueChanged.connect(MainWindow.set_electricity)
 
         self.tabWidget.setCurrentIndex(0)
 
@@ -318,22 +407,18 @@ class Ui_MainWindow(object):
 #if QT_CONFIG(shortcut)
         self.actionMods.setShortcut(QCoreApplication.translate("MainWindow", u"Ctrl+M", None))
 #endif // QT_CONFIG(shortcut)
+        self.actionHelp.setText(QCoreApplication.translate("MainWindow", u"Help", None))
+        self.label_search.setText(QCoreApplication.translate("MainWindow", u"Search", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_engines), QCoreApplication.translate("MainWindow", u"Engines", None))
-        ___qtablewidgetitem = self.tbl_wagons.horizontalHeaderItem(0)
-        ___qtablewidgetitem.setText(QCoreApplication.translate("MainWindow", u"Name", None))
-        ___qtablewidgetitem1 = self.tbl_wagons.horizontalHeaderItem(1)
-        ___qtablewidgetitem1.setText(QCoreApplication.translate("MainWindow", u"ID", None))
-        ___qtablewidgetitem2 = self.tbl_wagons.horizontalHeaderItem(2)
-        ___qtablewidgetitem2.setText(QCoreApplication.translate("MainWindow", u"Source", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_wagons), QCoreApplication.translate("MainWindow", u"Wagons", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_vehicles), QCoreApplication.translate("MainWindow", u"Vehicles", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_aircraft), QCoreApplication.translate("MainWindow", u"Aircraft", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_all), QCoreApplication.translate("MainWindow", u"All", None))
         self.groupBox_tokens.setTitle(QCoreApplication.translate("MainWindow", u"Tokens Budgets", None))
-        self.label_electricity.setText(QCoreApplication.translate("MainWindow", u"Electricity", None))
         self.label_coal.setText(QCoreApplication.translate("MainWindow", u"Coal", None))
-        self.label_diesel.setText(QCoreApplication.translate("MainWindow", u"Diesel", None))
         self.label_cash.setText(QCoreApplication.translate("MainWindow", u"Cash", None))
+        self.label_electricity.setText(QCoreApplication.translate("MainWindow", u"Electricity", None))
+        self.label_diesel.setText(QCoreApplication.translate("MainWindow", u"Diesel", None))
         self.groupBox_display.setTitle(QCoreApplication.translate("MainWindow", u"Display", None))
         self.label_unit.setText(QCoreApplication.translate("MainWindow", u"Speed unit", None))
         self.sel_unit.setItemText(0, QCoreApplication.translate("MainWindow", u"kmph", None))
@@ -345,9 +430,12 @@ class Ui_MainWindow(object):
         self.sel_cmap.setItemText(2, QCoreApplication.translate("MainWindow", u"Red-Green", None))
 
         self.groupBox.setTitle(QCoreApplication.translate("MainWindow", u"Files", None))
+        self.label_vdir.setText(QCoreApplication.translate("MainWindow", u"Vanilla directories", None))
+        self.label_others.setText(QCoreApplication.translate("MainWindow", u"Mod files", None))
         self.label_moddir.setText(QCoreApplication.translate("MainWindow", u"Mods folder", None))
-        self.label_others.setText(QCoreApplication.translate("MainWindow", u"Other files", None))
+        self.label_vfiles.setText(QCoreApplication.translate("MainWindow", u"Vanilla files", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_prefs), QCoreApplication.translate("MainWindow", u"Preferences", None))
-        self.menuFiles.setTitle(QCoreApplication.translate("MainWindow", u"Files", None))
+        self.label.setText("")
+        self.menuFiles.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
     # retranslateUi
 

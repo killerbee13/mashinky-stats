@@ -11,6 +11,7 @@ TRACTION_SCALE = 42.1
 ID = "id"
 CID = "cargo id"
 SOURCE = "source"
+VANILLA = "vanilla"
 # common
 NAME = "Name"
 LENGTH = "Length (u)"
