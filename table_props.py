@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import Optional
 import constants as C
 
 class Highlight(Enum):
@@ -13,6 +14,7 @@ class ColProps:
 	type: type
 	highlight: Highlight = Highlight.NONE
 	generated: bool = True
+	xml_key: Optional[str] = None
 
 props = {
 	'index': ColProps(type=int),
