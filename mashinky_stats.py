@@ -191,7 +191,7 @@ def finalize(cls):
 	def get(self, field, fallback=None):
 		try:
 			return self[field]
-		except KeyError:
+		except AttributeError:
 			return fallback
 	cls.get = get
 	def contains(self, field):
@@ -348,9 +348,9 @@ class Row:
 	#   Common:
 	name = field(str, C.NAME, xml='name')
 	index = table_field(int, 'Index')
-	source = table_field(Path, C.SOURCE, default='')
+	source = field(Path, 'source', C.SOURCE, default='')
 	vanilla = table_field(bool, C.VANILLA, default=False)
-	id = table_field(str, 'ID', xml=C.ID, default='')
+	id = field(str, 'id', 'ID', xml=C.ID, default='')
 	cid = default_field(Optional[str], C.CID, 'Cargo ID', xml='cargo')
 	vehicle_type = table_field(int, 'vehicle_type', xml='vehicle_type')
 	track = zero_field(int, None, C.TRACK, xml='track')
@@ -406,14 +406,22 @@ class Row:
 				return "Mail Engine"
 		return ct
 	raw_effect = field(str, None, xml='effect', default="")
+	@generated('Effect')
+	def effect(self):
+		effect = re.fullmatch(r'(?:profit\[[^]]*\])\*([0-9]*.?[0-9]*)',
+			self.raw_effect)
+		if effect:
+			return float(effect.group(1))-1
+		else:
+			return 1
 	@generated(C.BONUS)
 	def bonus(self):
 		effect = re.fullmatch(r'(?:profit\[[^]]*\])\*([0-9]*.?[0-9]*)',
 			self.raw_effect)
 		if effect:
-			return float(effect.group(1))
+			return round(100*(float(effect.group(1))-1))
 		else:
-			return 1
+			return ''
 
 	# Ratios and composites:
 	#   Prime movers:
@@ -423,7 +431,7 @@ class Row:
 	power_per_length = generated(lambda r: r.power/r.length, C.POWER_PER_LENGTH)
 
 	#   Cargo carriers:
-	profit = generated(lambda r: r.capacity*r.bonus, C.PROFITABILITY)
+	profit = generated(lambda r: r.capacity*r.effect, C.PROFITABILITY)
 	cargo_per_length = generated(lambda r: r.capacity/r.length, C.CARGO_PER_LENGTH)
 	profit_per_length = generated(lambda r: r.profit/r.length, C.PROFIT_PER_LENGTH)
 	cargo_per_wt = generated(lambda r: 10*r.capacity/r.weight_full, C.CARGO_PER_WT)
@@ -483,7 +491,7 @@ class Row:
 	def is_engine(self):
 		return self.vehicle_type == 0 and self.cost
 	def is_wagon(self):
-		return self.vehicle_type == 0 and self.capacity
+		return self.vehicle_type == 0 and self.ctype
 	def is_vehicle(self):
 		return self.vehicle_type == 1
 	def is_aircraft(self):
@@ -521,6 +529,11 @@ cargo_by_label = {
 
 
 def rnd(x: T, recip_tol=100) -> T:
+	try:
+		if type(x) is not bool and int(x) == x:
+			return int(x)
+	except:
+		pass
 	return math.floor(x*recip_tol)/recip_tol if type(x) is float else x
 
 def costs(raw: str) -> dict[str, float]:
@@ -546,191 +559,47 @@ def parse_eras(raw_epoch: str) -> str:
 				t_eras[e] = e
 	return "".join([str(e) for e in t_eras if e]) or '0'
 
-def all_stats(vehicle: dict[Any, Any], filename: Path = None, vanilla: bool = None):
-	try:
-		power = float(vehicle.get('power', 0))
-		max_speed = float(vehicle.get('max_speed', 0))
-		ctype = cargo_by_label.get(vehicle.get('cargo')) or ""
-		if int(vehicle['vehicle_type']) == 0 and power and ctype == C.PASSENGER:
-			ctype = "Pass. Engine"
-		elif int(vehicle['vehicle_type']) == 0 and power and ctype == C.MAIL:
-			ctype = "Mail Engine"
-		capacity = float(vehicle.get('capacity', 0))
-		weight_empty = float(vehicle['weight_empty'])
-		weight_full = float(vehicle['weight_full'])
-		
-		if type(vehicle['epoch']) is float:
-			vehicle['epoch'] = str(int(vehicle['epoch']))
-		raw_epoch = vehicle['epoch']
-		length = (
-			float(vehicle.get('length', 0))
-			+ float(vehicle.get('head_length', 0))
-			+ float(vehicle.get('tail_length', 0))
-		)
-		
-		cost = costs(vehicle['fuel_cost']) if vehicle.get('fuel_cost') else {}
-		adjcost = cost_adj(cost)
-		effect = re.fullmatch(r'(?:profit\[[^]]*\])\*([0-9]*.?[0-9]*)',
-			vehicle.get('effect', ""))
-		bonus = 1
-		if effect:
-			bonus = float(effect.group(1))
-		profit = capacity*bonus
-		
-		traction = math.floor(C.TRACTION_SCALE*power/max_speed) if max_speed else 0
-		towage = traction-weight_full
-		throughput = towage*max_speed
-		cargo_throughput = capacity*max_speed
-		profit_throughput = profit*max_speed
-		
-		def TP_c(c, t):
-			return (t/(cost.get(c, 0)*fixed_scale[c]) if power and cost.get(c)
-				else 0.)
-		TP = lambda c: TP_c(c, throughput)
-		TPc = lambda c: TP_c(c, cargo_throughput)
-		TPp = lambda c: TP_c(c, profit_throughput)
-		
-		eras = parse_eras(raw_epoch)
-		#print(raw_epoch, repr(epochs), eras)
-		
-		return vehicle | {
-			# technical info
-			C.ID: str(vehicle[C.ID]),
-			C.CID: str(vehicle.get('cargo', "")),
-			C.SOURCE: str(filename) if filename is not None else vehicle[C.SOURCE],
-			C.VANILLA: vanilla if vanilla is not None else vehicle.get(C.VANILLA, False),
-			
-			# common
-			C.NAME: str(vehicle['name'].rstrip()),
-			C.LENGTH: length,
-			C.WEIGHT: weight_full,
-			C.WEIGHT_FULL: weight_full,
-			C.WEIGHT_EMPTY: weight_empty,
-			C.EPOCHS: str(raw_epoch),
-			C.ERA: int(eras[0]),
-			C.ERAS: eras,
-			C.TRACK: int(vehicle.get('track', 0)),
-			
-			# prime movers
-			C.SPEED: max_speed,
-			C.SPEED_MPH: round(max_speed/C.KM_PER_MI),
-			C.POWER: power,
-			C.TRACTION: traction,
-			C.TOWAGE: towage,
-			C.THROUGHPUT: throughput,
-			C.PWT_FULL: safe_div(power, traction),
-			C.PWT_EMPTY: power/weight_full,
-			C.TOW_PER_LENGTH: towage/length,
-			C.POWER_PER_LENGTH: power/length,
-			
-			# cargo carriers
-			C.TYPE: ctype,
-			C.CARGO: capacity,
-			C.BONUS: round(100*(bonus-1)) if bonus != 1 else "",
-			C.PROFITABILITY: profit,
-			C.CARGO_PER_LENGTH: capacity/length,
-			C.PROFIT_PER_LENGTH: profit/length,
-			C.CARGO_PER_WT: 10*capacity/weight_full,
-			C.PROFIT_PER_WT: 10*profit/weight_full,
-			
-			# units (i.e. power and capacity both != 0)
-			C.TP_CARGO: cargo_throughput,
-			C.TP_PROFIT: profit_throughput,
-			
-			# fuel
-			C.ADJCOST: adjcost,
-			C.CASH: cost.get(C.CASH, 0.),
-			C.COAL: cost.get(C.COAL, 0.),
-			C.DIESEL: cost.get(C.DIESEL, 0.),
-			C.ELECTRIC: cost.get(C.ELECTRIC, 0.),
-			
-			C.TP_ADJCOST: adjcost and throughput/(adjcost*adj_scale),
-			C.TP_CASH: TP(C.CASH),
-			C.TP_COAL: TP(C.COAL),
-			C.TP_DIESEL: TP(C.DIESEL),
-			C.TP_ELECTRIC: TP(C.ELECTRIC),
-			
-			C.TPC_ADJCOST: adjcost and cargo_throughput/(adjcost*adj_scale),
-			C.TPP_ADJCOST: adjcost and profit_throughput/(adjcost*adj_scale),
-			C.TPC_CASH: TPc(C.CASH),
-			C.TPP_CASH: TPp(C.CASH),
-			C.TPC_COAL: TPc(C.COAL),
-			C.TPP_COAL: TPp(C.COAL),
-			C.TPC_DIESEL: TPc(C.DIESEL),
-			C.TPP_DIESEL: TPp(C.DIESEL),
-			C.TPC_ELECTRIC: TPc(C.ELECTRIC),
-			C.TPP_ELECTRIC: TPp(C.ELECTRIC),
-			C.COSTS_RAW: repr(cost),
-			
-			# train-specific
-			C.CD6: towage/(6-length),
-			C.CD8: towage/(8-length),
-			
-			# wagon-specific
-			C.COMPOUND_EFFICIENCY: (capacity/length)*(10*capacity/weight_full),
-			C.COMPOUND_PROFITABILITY: (profit/length)*(10*profit/weight_full),
-			C.DENSITY: weight_full/length,
-			C.WT_PER_CARGO: safe_div(weight_full, capacity),
-			C.CARGO_UNIT_WT: safe_div(weight_full-weight_empty, capacity),
-		}
-	except Exception as e:
-		e.add_note(f"ID: {vehicle.get(C.ID)}, source: {filename}")
-		e.add_note(repr(vehicle))
-		raise
-
-def filter_row(vehicle, fields):
-	try:
-		return {f: vehicle[f] for f in fields}
-	except KeyError as e:
-		e.add_note(repr(vehicle))
-		raise
-
-# This is bad but it's the least repetitive way without rewriting quite a bit
-null_row = all_stats({
-C.ID: '0', 'vehicle_type': '0', 'name': '', 'weight_full': 1.,
-'weight_empty': 1., 'epoch': '0', 'length': 1.
-}, '')
-all_labels = list(null_row)
-
+all_labels = Row.keys()
+currencies = ['cash', 'coal', 'diesel', 'electric',]
 train_direct_labels = [
-	C.NAME, C.SPEED, C.TRACTION, C.POWER, C.WEIGHT, C.LENGTH, C.ERA
+	'name', 'max_speed', 'traction', 'power', 'weight', 'length', 'era'
 ]
 
 train_row_labels = [
-	C.NAME, C.SPEED, C.TRACTION, C.POWER, C.WEIGHT, C.LENGTH, C.ERA, C.TOWAGE,
-	C.PWT_EMPTY, C.PWT_FULL, C.TOW_PER_LENGTH, C.POWER_PER_LENGTH, C.THROUGHPUT,
-	C.CD6, C.CD8, C.SPEED_MPH,
-	C.TP_CASH, C.TP_COAL, C.TP_DIESEL, C.TP_ELECTRIC,
-	]+C.CURRENCIES+[
-	C.TP_ADJCOST, C.ADJCOST, # C.COSTS_RAW,
-	C.ERAS, C.ID, C.SOURCE
+	'name', 'max_speed', 'traction', 'power', 'weight', 'length', 'era',
+	'towage', 'pwt_empty', 'pwt_full', 'tow_per_length', 'power_per_length',
+	'throughput', 'CD6', 'CD8', 'max_speed_mph',
+	'TP_cash', 'TP_coal', 'TP_diesel', 'TP_electric',
+	]+currencies+[
+	'TP_adjcost', 'adjcost', # C.COSTS_RAW,
+	'eras', 'id', 'source'
 ]
 
 wagon_direct_labels = [
-	C.NAME, C.TYPE, C.CARGO, C.WEIGHT_EMPTY, C.WEIGHT_FULL, C.LENGTH, C.ERA,
-	C.BONUS
+	'name', 'ctype', 'capacity', 'weight_empty', 'weight_full', 'length', 'era',
+	'bonus'
 ]
 
 wagon_row_labels = [
-	C.NAME, C.TYPE, C.CARGO, C.WEIGHT_EMPTY, C.WEIGHT_FULL, C.LENGTH, C.ERA,
-	C.BONUS, C.CARGO_PER_LENGTH, C.CARGO_PER_WT, C.COMPOUND_EFFICIENCY,
-	C.DENSITY, C.PROFITABILITY, C.PROFIT_PER_LENGTH, C.PROFIT_PER_WT,
-	C.COMPOUND_PROFITABILITY, C.WT_PER_CARGO, C.CARGO_UNIT_WT,
-	C.ERAS, C.ID, C.CID, C.SOURCE,
-	C.POWER
+	'name', 'ctype', 'capacity', 'weight_empty', 'weight_full', 'length', 'era',
+	'bonus', 'cargo_per_length', 'cargo_per_wt', 'compound_efficiency',
+	'density', 'profit', 'profit_per_length', 'profit_per_wt',
+	'compound_profitability', 'wt_per_cargo', 'cargo_unit_wt',
+	'eras', 'id', 'cid', 'source',
+	'power'
 ]
 
+acurrencies = ['adjcost'] + currencies
+map_curs = lambda pfx: [pfx + cur for cur in acurrencies]
 vehicle_row_labels = [
-	C.NAME, C.TYPE, C.CARGO, C.SPEED, C.POWER, C.WEIGHT_EMPTY, C.WEIGHT_FULL,
-	C.LENGTH, C.ERA, C.BONUS, C.PWT_EMPTY, C.PWT_FULL, C.THROUGHPUT, C.TP_CARGO,
-	C.CARGO_PER_LENGTH, C.PROFITABILITY, C.PROFIT_PER_LENGTH, C.CARGO_UNIT_WT,
-	C.SPEED_MPH,
-	]+C.CURRENCIES+[ C.ADJCOST,
-	C.TP_ADJCOST, C.TP_CASH, C.TP_COAL, C.TP_DIESEL, C.TP_ELECTRIC,
-	C.TPC_ADJCOST, C.TPC_CASH, C.TPC_COAL, C.TPC_DIESEL, C.TPC_ELECTRIC,
-	C.TPP_ADJCOST, C.TPP_CASH, C.TPP_COAL, C.TPP_DIESEL, C.TPP_ELECTRIC,
+	'name', 'ctype', 'capacity', 'max_speed', 'power', 'weight_empty',
+	'weight_full', 'length', 'era', 'bonus', 'pwt_empty', 'pwt_full',
+	'throughput', 'cargo_throughput', 'cargo_per_length', 'profit',
+	'profit_per_length', 'cargo_unit_wt', 'max_speed_mph',
+	]+currencies+[ 'adjcost',
+	]+map_curs('TP_')+currencies+map_curs('TPc_')+map_curs('TPp_')+[
 	# C.COSTS_RAW,
-	C.ERAS, C.ID, C.CID, C.SOURCE
+	'eras', 'id', 'cid', 'source'
 ]
 
 labels_by_type = {
@@ -748,6 +617,8 @@ def read_expected(filename):
 			reader = csv.DictReader(file, quoting=csv.QUOTE_NONNUMERIC)
 			for row in reader:
 				try:
+					#val = Row.from_csv(row)
+					#print(f"read_expected: {row} -> {val}")
 					val = {
 						f: (None if type(v) is str and v.startswith('#') else v) for f, v in row.items()
 							if not (type(v) is str and v.startswith('='))
@@ -759,12 +630,12 @@ def read_expected(filename):
 					except KeyError as e:
 						e.add_note(repr(val))
 						raise
-					ret[row[C.NAME].lower()] = {
+					ret[exp_name_key(val[C.NAME])] = {
 						'data': val,
 						'seen': False
 					}
 				except KeyError as e:
-					e.add_note(f"in: {repr(row)}, source: {filename}")
+					e.add_note(f"in: {repr(val)}, source: {filename}")
 					raise
 	return ret
 
@@ -781,10 +652,17 @@ def compare_exp_val(val, exp, field):
 	else:
 		return val == exp
 
+def key_to_csv(field):
+	return vars(Row)[field].csv
+def keys_to_csv(fields):
+	return [key_to_csv(field) for field in fields]
+def exp_name_key(name):
+	return re.fullmatch(r'\W*(.*?)\W*', name.lower()).group(1)
+
 def compare_vehicle(vehicle, expected, label, fields, elementary_fields, fmt, out):
 	if expected is None:
 		print(
-			f"{label} new: {fmt(vehicle)} ID={vehicle[C.ID]}:{vehicle[C.SOURCE]}",
+			f"{label} new: {fmt(vehicle)} ID={vehicle.id}:{vehicle.source}",
 			file=out)
 	elif vehicle is None:
 		if not '*' in expected[C.NAME]:
@@ -793,58 +671,66 @@ def compare_vehicle(vehicle, expected, label, fields, elementary_fields, fmt, ou
 		discrepancy = []
 		for field in fields:
 			try:
-				if field in expected \
-					and not compare_exp_val(vehicle.get(field), expected[field],
+				if key_to_csv(field) in expected \
+					and not compare_exp_val(vehicle.get(field), expected[key_to_csv(field)],
 					field):
 					discrepancy.append(field)
-			except TypeError as e:
-				e.add_note(f"{field}: {repr(vehicle.get(field))} {repr(expected[field])}")
+			except AttributeError as e:
+				e.add_note(f"expected: {repr(expected)}")
+				e.add_note(f"{field}: {repr(vehicle.get(field))} {repr(expected.get(key_to_csv(field)))}")
 				e.add_note(repr(vehicle) + " " + repr(expected))
 				raise
 		if discrepancy:
 			print(
 				f"{label} diff: got ({fmt(vehicle)}) expected ({fmt(expected)}) "
-				f"ID={vehicle[C.ID]}:{vehicle[C.SOURCE]}",
+				f"ID={vehicle.id}:{vehicle.source}",
 				file=out)
 			print("\t" + "; ".join(
 				["{}{}:{},{}".format("!" if f in elementary_fields else "=",
-					f, repr(rnd(vehicle[f])), repr(rnd(expected[f])))
+					f, repr(rnd(vehicle[f])), repr(rnd(expected[key_to_csv(f)])))
 					for f in discrepancy]),
 				file=out)
 
-ign_fields = [C.NAME, C.ERA, C.ERAS]
+ign_fields = ['name', 'era', 'eras', 'max_speed_mph']
 def elem(fields):
-	return list(filter(lambda x: not x in ign_fields, fields))
+	return list(filter(lambda x: x not in ign_fields and 'adjcost' not in x, fields))
 
 def compare_train(vehicle, expected, out):
-	fields = [
-		C.SPEED, C.POWER, C.WEIGHT, C.LENGTH,
-		C.CASH, C.COAL, C.DIESEL, C.ELECTRIC
-	]
 	def fmt(t):
-		try:
+		if isinstance(t, Row):
 			return "{n} ({e}) s={s} p={p} w={w} l={l} c={c}".format(
-				n=t[C.NAME], e=t.get(C.ERAS, t[C.ERA]),
-				s=rnd(t[C.SPEED]),
-				p=rnd(t[C.POWER]), w=rnd(t[C.WEIGHT]),
-				l=rnd(t[C.LENGTH]),
-				c=f"{t[C.CASH]};{t[C.COAL]}c;{t[C.DIESEL]}d;{t[C.ELECTRIC]}e")
-		except KeyError as e:
-			e.add_note(repr(t))
-			raise
+				n=t.name, e=t.get('eras', t.era),
+				s=rnd(t.max_speed),
+				p=rnd(t.power), w=rnd(t.weight_full),
+				l=rnd(t.length),
+				c=f"{rnd(t.cash)};{rnd(t.coal)}c;{rnd(t.diesel)}d;{rnd(t.electric)}e")
+		else:
+			try:
+				return "{n} ({e}) s={s} p={p} w={w} l={l} c={c}".format(
+					n=t[C.NAME], e=t.get(C.ERAS, t[C.ERA]),
+					s=rnd(t[C.SPEED]),
+					p=rnd(t[C.POWER]), w=rnd(t[C.WEIGHT]),
+					l=rnd(t[C.LENGTH]),
+					c=f"{rnd(t[C.CASH])};{rnd(t[C.COAL])}c;{rnd(t[C.DIESEL])}d;{rnd(t[C.ELECTRIC])}e")
+			except KeyError as e:
+				e.add_note(repr(t))
+				raise
 	return compare_vehicle(vehicle, expected, 'train', elem(train_row_labels), train_direct_labels, fmt, out)
 
 def compare_wagon(vehicle, expected, out):
-	fields = [
-		C.TYPE, C.CARGO, C.WEIGHT_EMPTY,
-		C.WEIGHT_FULL, C.LENGTH, C.BONUS
-	]
 	def fmt(t):
-		return "{n} ({e}) t={t} c={c} wu={wu} wl={wl} l={l} b={b} p={p}".format(
-			n=t[C.NAME], e=t.get(C.ERAS, t[C.ERA]),
-			t=rnd(t[C.TYPE]), c=rnd(t[C.CARGO]),
-			wu=rnd(t[C.WEIGHT_EMPTY]), wl=rnd(t[C.WEIGHT_FULL]),
-			l=rnd(t[C.LENGTH]), b=rnd(t[C.BONUS]), p=rnd(t.get(C.POWER)))
+		if isinstance(t, Row):
+			return "{n} ({e}) t={t} c={c} wu={wu} wl={wl} l={l} b={b} p={p}".format(
+				n=t.name, e=t.get('eras', t.era),
+				t=rnd(t.ctype), c=rnd(t.capacity),
+				wu=rnd(t.weight_empty), wl=rnd(t.weight_full),
+				l=rnd(t.length), b=rnd(t.bonus), p=rnd(t.power))
+		else:
+			return "{n} ({e}) t={t} c={c} wu={wu} wl={wl} l={l} b={b} p={p}".format(
+				n=t[C.NAME], e=t.get(C.ERAS, t[C.ERA]),
+				t=rnd(t[C.TYPE]), c=rnd(t[C.CARGO]),
+				wu=rnd(t[C.WEIGHT_EMPTY]), wl=rnd(t[C.WEIGHT_FULL]),
+				l=rnd(t[C.LENGTH]), b=rnd(t[C.BONUS]), p=rnd(t.get(C.POWER)))
 	return compare_vehicle(vehicle, expected, 'wagon', elem(wagon_row_labels), wagon_direct_labels, fmt, out)
 
 def read_files(files, vfiles):
@@ -852,45 +738,38 @@ def read_files(files, vfiles):
 	def impl(files, vanilla):
 		nonlocal idx
 		out = []
-		out2 = []
 		for file in files:
 			dom = BeautifulSoup(slurp(file), "lxml")
 			for tag in dom.find_all('wagontype'):
-				row = all_stats(tag.attrs, file, vanilla)
-				row['index'] = idx
 				try:
-					out2.append(Row.from_xml(tag.attrs, source=file, vanilla=vanilla, index=idx))
+					out.append(Row.from_xml(tag.attrs, source=file, vanilla=vanilla, index=idx))
 				except ValueError as e:
 					e.add_note(repr(tag.attrs))
 					e.add_note(repr(file))
 					raise
-				#print(out2[-1].asdict(False))
+				#print(out[-1].asdict(False))
 				idx = idx + 1
-				out.append(row)
-		return out,out2
-	v1,v2 = impl(vfiles, True)
-	t1,t2 = impl(files, False)
-	return (v1+t1), (v2+t2)
-
+		return out
+	return impl(vfiles, True)+impl(files, False)
 
 def process_files(table, out, msg, fields, pred, exp, comp, exp_out):
 	def impl(outfile, table):
 		writer = csv.DictWriter(
-			outfile, fieldnames=fields,
+			outfile, fieldnames=keys_to_csv(fields),
 			quoting=csv.QUOTE_NONNUMERIC, extrasaction='ignore')
 		writer.writeheader()
-		for vehicle in (filter_row(row, fields) for row in table if pred(row)):
-			writer.writerow(vehicle)
+		for vehicle in (row for row in table if pred(row)):
+			writer.writerow(vehicle.to_csv())
 			if exp:
 				try:
-					name = vehicle[C.NAME].lower()
+					name = exp_name_key(vehicle.name)
 					e = exp.get(name)
 					comp(vehicle, e['data'] if e else None, exp_out)
 					if e:
 						e['seen'] = True
 				except KeyError as e:
 					e.add_note(repr(vehicle))
-					e.add_note(f"in {vehicle[C.ID]}, source: {vehicle[C.SOURCE]}")
+					e.add_note(f"in {vehicle['id']}, source: {vehicle['source']}")
 					raise
 		if exp:
 			for vehicle in (
@@ -905,32 +784,23 @@ def process_files(table, out, msg, fields, pred, exp, comp, exp_out):
 		with open(out, 'w', newline='') as outfile:
 			impl(outfile, table)
 
-def filter_engine(a):
-	return int(a['vehicle_type']) == 0 and a.get('fuel_cost')
-def filter_wagon(a):
-	return int(a['vehicle_type']) == 0 and a.get('cargo')
-def filter_vehicle(a):
-	return int(a['vehicle_type']) == 1
-def filter_aircraft(a):
-	return int(a['vehicle_type']) == 3
-
 def run(files, vfiles, train_out, wagon_out, vehicle_out, aircraft_out, univ_out, expected_trains, expected_wagons, unexpected_outstream):
-	table,t2 = read_files(files, vfiles)
+	table = read_files(files, vfiles)
 
 	process_files(table, train_out, "Trains:", train_row_labels,
-		filter_engine,
+		Row.is_engine,
 		expected_trains, compare_train, unexpected_outstream)
 
 	process_files(table, wagon_out,"Wagons:", wagon_row_labels,
-		filter_wagon,
+		Row.is_wagon,
 		expected_wagons, compare_wagon, unexpected_outstream)
 
 	process_files(table, vehicle_out, "Vehicles:", vehicle_row_labels,
-		filter_vehicle,
+		Row.is_vehicle,
 		None, None, None)
 
 	process_files(table, aircraft_out, "Aircraft:", vehicle_row_labels,
-		filter_aircraft,
+		Row.is_aircraft,
 		None, None, None)
 
 	if univ_out:

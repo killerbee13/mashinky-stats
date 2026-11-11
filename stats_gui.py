@@ -7,8 +7,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QTableWidget,
 from PySide6.QtCore import Slot, Qt, QSize
 from PySide6.QtGui import QColor, QBrush, QFontMetrics, QPixmap
 from ui_mainwindow import Ui_MainWindow
-from mashinky_stats import (Row, handle_cli, read_files, all_stats,
-	filter_engine, filter_wagon, filter_vehicle, filter_aircraft,
+from mashinky_stats import (Row, handle_cli, read_files,
 	token_supply, adj_costs, labels_by_type, rnd)
 import constants as C
 
@@ -71,7 +70,7 @@ def log_timer(oself=None, print_args=True):
 
 currencies = ['cash', 'coal', 'diesel', 'electric', 'adjcost',]
 map_curs = lambda pfx: [pfx + cur for cur in currencies]
-pink = QColor.fromRgb(255, 224, 224)
+red = QColor.fromRgb(255, 224, 224)
 
 class MainWindow(QMainWindow):
 	engine_labels = [
@@ -143,19 +142,24 @@ class MainWindow(QMainWindow):
 		self.ui.lineEdit_vfiles.setText(" ".join(self.args.vanilla))
 		self.ui.lineEdit_vdir.setText(" ".join(self.args.vanilla_dir))
 		self.update_data()
-
-		self.tables = [
-			(self.ui.tbl_engines, self.engine_labels, self.engines),
-			(self.ui.tbl_wagons, self.wagon_labels, self.wagons),
-			(self.ui.tbl_vehicles, self.vehicle_labels, self.vehicles),
-			(self.ui.tbl_aircraft, self.aircraft_labels, self.aircraft),
-			(self.ui.tbl_all, self.all_labels, list(range(250))),
-			#(self.ui.tbl_all, self.all_labels, self.data),
-		]
 		self.cur_idxs = self.g_cur_idxs()
 		self.dirty = [False]*len(self.tables)
 		self.populate()
 		#print(self.all_labels)
+
+	@log_timer()
+	def update_data(self):
+		self.data = read_files(self.files, self.vfiles)
+		filt = lambda f: [r.index for r in self.data if f(r)]
+
+		self.tables = [
+			(self.ui.tbl_engines, self.engine_labels, filt(Row.is_engine)),
+			(self.ui.tbl_wagons, self.wagon_labels, filt(Row.is_wagon)),
+			(self.ui.tbl_vehicles, self.vehicle_labels, filt(Row.is_vehicle)),
+			(self.ui.tbl_aircraft, self.aircraft_labels, filt(Row.is_aircraft)),
+			(self.ui.tbl_all, self.all_labels, list(range(min(len(self.data), 250)))),
+			#(self.ui.tbl_all, self.all_labels, self.data),
+		]
 
 	@log_timer()
 	def populate(self):
@@ -178,27 +182,13 @@ class MainWindow(QMainWindow):
 			+ " cells, " + str(sum((w*h for w, h in sizes))) + " total")
 
 	@log_timer()
-	def update_data(self):
-		self.d1,self.data = read_files(self.files, self.vfiles)
-		filt = lambda f: [r.index for r in self.data if f(r)]
-
-#		self.engines = list(filter(filter_engine, self.data))
-#		self.wagons = list(filter(filter_wagon, self.data))
-#		self.vehicles = list(filter(filter_vehicle, self.data))
-#		self.aircraft = list(filter(filter_aircraft, self.data))
-		self.engines = filt(Row.is_engine)
-		self.wagons = filt(Row.is_wagon)
-		self.vehicles = filt(Row.is_vehicle)
-		self.aircraft = filt(Row.is_aircraft)
-
-	@log_timer()
 	def populate_table(self, tbl, labels, d):
 		tbl.setColumnCount(len(labels))
 		l2 = [translate_header(l) for l in labels]
 		tbl.setHorizontalHeaderLabels(l2)
 		tbl.setRowCount(len(d))
 		tbl.setVerticalHeaderLabels([
-			self.data[row].get(C.NAME, self.data[row].get('name')) for row in d])
+			self.data[row].name for row in d])
 		for r, i in enumerate(d):
 			for c, f in enumerate(labels):
 				d = self.data[i][f]
@@ -209,13 +199,11 @@ class MainWindow(QMainWindow):
 				tbl.setItem(r, c, item)
 				pls_help_bug.append(None)
 		h = tbl.horizontalHeader()
-		#h.sectionClicked.connect(self.reset_labels(tbl))
 		h.sortIndicatorChanged.connect(self.reset_labels(tbl))
-		h.hideSection(0)
+		tbl.hideColumn(0)
 		tbl.sortItems(0, Qt.SortOrder.AscendingOrder)
 
 	@Slot()
-	#@log_timer()
 	def update_units(self):
 		unhidden_fields = []
 		hidden_fields = []
@@ -265,7 +253,7 @@ class MainWindow(QMainWindow):
 					if new != old:
 						#print(f"{tbl.objectName()}item({r},{c}) '{new}' != '{old}'")
 						item.setText(new)
-						item.setBackground(pink)
+						item.setBackground(red)
 						count = count + 1
 					elif item.background() != QBrush():
 						item.setBackground(QBrush())
@@ -286,7 +274,6 @@ class MainWindow(QMainWindow):
 
 	def reset_labels(self, tbl):
 		@Slot(int, Qt.SortOrder)
-		#@log_timer(self)
 		def reset_labels_impl(v, o):
 			if self.populated:
 				print(f"reset({v}, {o})")
@@ -296,7 +283,6 @@ class MainWindow(QMainWindow):
 			self.reset_labels_for(tbl)
 		return reset_labels_impl
 
-	#@log_timer()
 	def reset_labels_for(self, tbl):
 		van_idx = -1
 		name_idx = -1
@@ -305,6 +291,7 @@ class MainWindow(QMainWindow):
 				van_idx = c
 			if tbl.horizontalHeaderItem(c).text() == C.NAME:
 				name_idx = c
+		tbl.hideColumn(van_idx)
 		for r in range(tbl.rowCount()):
 			#print(f"set v{r} from {tbl.verticalHeaderItem(r).text()} to {tbl.item(r,0).text()}")
 			l = tbl.verticalHeaderItem(r)
@@ -336,42 +323,36 @@ class MainWindow(QMainWindow):
 		if not self.populated:
 			return
 		token_supply[C.CASH] = val
-		#print(token_supply)
 		self.update_curs()
 	@Slot(int)
 	def set_coal(self, val):
 		if not self.populated:
 			return
 		token_supply[C.COAL] = val
-		#print(token_supply)
 		self.update_curs()
 	@Slot(int)
 	def set_diesel(self, val):
 		if not self.populated:
 			return
 		token_supply[C.DIESEL] = val
-		#print(token_supply)
 		self.update_curs()
 	@Slot(int)
 	def set_electric(self, val):
 		if not self.populated:
 			return
 		token_supply[C.ELECTRIC] = val
-		#print(token_supply)
 		self.update_curs()
 	@Slot(int)
 	def set_disp_unit(self, val):
 		if not self.populated:
 			return
 		self.disp["unit"] = val
-		#print(self.disp)
 		self.update_units()
 	@Slot(int)
 	def set_disp_cmap(self, val):
 		if not self.populated:
 			return
 		self.disp["cmap"] = val
-		#print(self.disp)
 		self.update_units()
 
 class Table:
@@ -389,7 +370,6 @@ if __name__ == "__main__":
 	sys.exit(app.exec())
 
 # Todo:
-# Go over the available columns and their order; hook up the speed units setting
 # Add cmaps and highlighting
 # I haven't quite decided if I'm going to do a custom model/view thing or use a QSqlTableModel with an in-memory sqlite3 db
 # Add search
