@@ -1,13 +1,15 @@
 # This Python file uses the following encoding: utf-8
 import sys
-from PySide6.QtWidgets import (QApplication, QMainWindow, QTableWidget,
-	QTableWidgetItem)
-from PySide6.QtCore import Slot, Qt
-from PySide6.QtGui import QColor, QBrush, QFontMetrics
+import time
+import functools
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QTableWidget,
+	QTableWidgetItem, QLabel)
+from PySide6.QtCore import Slot, Qt, QSize
+from PySide6.QtGui import QColor, QBrush, QFontMetrics, QPixmap
 from ui_mainwindow import Ui_MainWindow
-from mashinky_stats import (handle_cli, read_files, all_stats,
+from mashinky_stats import (Row, handle_cli, read_files, all_stats,
 	filter_engine, filter_wagon, filter_vehicle, filter_aircraft,
-	token_supply, labels_by_type, rnd)
+	token_supply, adj_costs, labels_by_type, rnd)
 import constants as C
 
 pls_help_bug = []
@@ -17,34 +19,129 @@ def rgb_from_hex(code):
 	rgb = tuple(int(code_hex[i:i+2], 16) for i in (0, 2, 4))
 	return QColor.fromRgb(rgb[0], rgb[1], rgb[2])
 
+def translate_header(l):
+	return vars(Row).get(l).tbl if l in vars(Row) else l
+
+def fmt_cell(field, contents):
+	if field == 'index':
+		return ('     '+str(contents))[-5:]
+	else:
+		return str(rnd(contents))
+
+def log_timer(oself=None, print_args=True):
+	#print(f"log_timer({oself})")
+	def decorator(func):
+		#print(f"log_timer({oself})({func}) {type(func)}")
+		def select_widget(args):
+			if oself:
+				return oself.timer_widget
+			else:
+				return args[0].timer_widget
+		@functools.wraps(func)
+		def impl2(*args, **kwargs):
+			#return func(*args, **kwargs)
+			#print(repr(type(args[0])))
+			start = time.monotonic_ns()
+			ret = func(*args, **kwargs)
+			end = time.monotonic_ns()
+			delta_ms = (end-start)/1000000
+			#print(select_widget(args))
+			select_widget(args).setText(f"{func.__name__}: {delta_ms}ms")
+			if print_args:
+				def s(x):
+					if type(x) is Row:
+						return "<Row>"
+					elif type(x) is list:
+						return "<list>"
+					elif type(x) is MainWindow:
+						return "self"
+					elif isinstance(x, QWidget):
+						return x.objectName()
+					else:
+						return str(x)
+				args_s = ', '.join([s(x) for x in args])
+				print(f"{func.__name__}({args_s}) took {delta_ms}ms")
+			else:
+				print(f"{func.__name__}() took {delta_ms}ms")
+			return ret
+		return impl2
+	if callable(oself):
+		raise ValueError()
+	return decorator
+
+currencies = ['cash', 'coal', 'diesel', 'electric', 'adjcost',]
+map_curs = lambda pfx: [pfx + cur for cur in currencies]
+pink = QColor.fromRgb(255, 224, 224)
+
 class MainWindow(QMainWindow):
-	engine_labels = labels_by_type['engine'].copy()
-	wagon_labels = labels_by_type['wagon'].copy()
-	vehicle_labels = labels_by_type['vehicle'].copy()
-	aircraft_labels = labels_by_type['aircraft'].copy()
-	all_labels = labels_by_type['all'].copy()
+	engine_labels = [
+		'name', 'max_speed', 'max_speed_mph', 'power', 'traction', 'towage', 'weight',
+		'length', 'eras', 'throughput', 'pwt_full', 'pwt_empty',
+		'tow_per_length', 'power_per_length',
+		]+map_curs('TP_')+currencies+[
+		'CD6', 'CD8', 'era', 'id', 'source', 'vanilla', 'index'
+	]
+	wagon_labels = [
+		'name', 'ctype', 'capacity', 'weight_empty', 'weight_full', 'length', 'eras',
+		'bonus', 'cargo_per_length', 'cargo_per_wt', 'compound_efficiency',
+		'density', 'profit', 'profit_per_length', 'profit_per_wt',
+		'compound_profitability', 'wt_per_cargo', 'era', 'id', 'cid', 'source',
+		'power', 'vanilla', 'index'
+	]
+	vehicle_labels = [
+		'name', 'ctype', 'capacity', 'max_speed', 'max_speed_mph', 'power',
+		'weight_empty', 'weight_full', 'length', 'eras', 'bonus',
+		'pwt_full', 'pwt_empty', 'throughput', 'cargo_throughput',
+		'cargo_per_length', 'profit', 'profit_per_length', 'cargo_unit_wt',
+		]+map_curs('TP_')+currencies+map_curs('TPc_')+map_curs('TPp_')+[
+		'era', 'id', 'cid', 'source', 'vanilla', 'index'
+	]
+	aircraft_labels = vehicle_labels.copy()
+	all_labels = Row().keys()
 	disp = {"unit": 0, "cmap": 0}
+	speed_units = (['max_speed', 'max_speed_reverse'], ['max_speed_mph', 'max_speed_reverse_mph'])
 	data = []
 	tables = []
 	ui = Ui_MainWindow()
 	populated = False
+	timer_widget = None
 
+	@log_timer()
+	def handle_cli(self):
+		self.args, self.files, self.vfiles = handle_cli(True)
+
+	def g_cur_idxs(self):
+		def scan(labels):
+			ret = []
+			for i,l in enumerate(labels):
+				if any((cur in l for cur in currencies)):
+					ret.append(i)
+			return ret
+		return [scan(labels) for tbl, labels, data in self.tables]
+
+	@log_timer()
+	def setupUi(self):
+		self.ui.setupUi(self)
+
+	@log_timer()
 	def __init__(self, argv):
 		super(MainWindow, self).__init__()
+		self.timer_widget = QLabel()
 
-		self.args, self.files, self.vfiles = handle_cli(True)
-		self.ui.setupUi(self)
+		self.handle_cli()
+		self.setupUi()
+
+		self.statusBar().addPermanentWidget(self.timer_widget)
 
 		self.ui.amt_cash.setValue(token_supply[C.CASH])
 		self.ui.amt_coal.setValue(token_supply[C.COAL])
 		self.ui.amt_diesel.setValue(token_supply[C.DIESEL])
-		self.ui.amt_electricity.setValue(token_supply[C.ELECTRIC])
+		self.ui.amt_electric.setValue(token_supply[C.ELECTRIC])
 
 		self.ui.lineEdit_others.setText(" ".join(self.args.files))
 		self.ui.lineEdit_moddir.setText(" ".join(self.args.path))
 		self.ui.lineEdit_vfiles.setText(" ".join(self.args.vanilla))
 		self.ui.lineEdit_vdir.setText(" ".join(self.args.vanilla_dir))
-
 		self.update_data()
 
 		self.tables = [
@@ -52,20 +149,26 @@ class MainWindow(QMainWindow):
 			(self.ui.tbl_wagons, self.wagon_labels, self.wagons),
 			(self.ui.tbl_vehicles, self.vehicle_labels, self.vehicles),
 			(self.ui.tbl_aircraft, self.aircraft_labels, self.aircraft),
-			(self.ui.tbl_all, self.all_labels, self.data[:250]),
+			(self.ui.tbl_all, self.all_labels, list(range(250))),
 			#(self.ui.tbl_all, self.all_labels, self.data),
 		]
+		self.cur_idxs = self.g_cur_idxs()
+		self.dirty = [False]*len(self.tables)
+		self.populate()
+		#print(self.all_labels)
 
-		for tbl, labels, data in self.tables:
-			labels.append(C.VANILLA)
-			labels.append('index')
-			self.populate_table(tbl, labels, data)
+	@log_timer()
+	def populate(self):
+		for tbl, labels, d in self.tables:
+			self.populate_table(tbl, labels, d)
 			h = tbl.horizontalHeader()
 			h.setSectionsMovable(True)
 			h.setSortIndicatorClearable(True)
 			tbl.setSortingEnabled(True)
 			tbl.cellClicked.connect(self.tbl_click(tbl))
-			self.reset_labels_for(tbl)
+			#self.reset_labels_for(tbl)
+		self.update_units()
+		#self.update_curs()
 		self.populated = True
 
 		sizes = [(tbl.columnCount(), tbl.rowCount()) for tbl, l, d in self.tables]
@@ -74,57 +177,98 @@ class MainWindow(QMainWindow):
 			", ".join([f"{h}*{w}={w*h}" for (w, h) in sizes])
 			+ " cells, " + str(sum((w*h for w, h in sizes))) + " total")
 
+	@log_timer()
 	def update_data(self):
-		self.data = read_files(self.files, self.vfiles)
+		self.d1,self.data = read_files(self.files, self.vfiles)
+		filt = lambda f: [r.index for r in self.data if f(r)]
 
-		self.engines = list(filter(filter_engine, self.data))
-		self.wagons = list(filter(filter_wagon, self.data))
-		self.vehicles = list(filter(filter_vehicle, self.data))
-		self.aircraft = list(filter(filter_aircraft, self.data))
+#		self.engines = list(filter(filter_engine, self.data))
+#		self.wagons = list(filter(filter_wagon, self.data))
+#		self.vehicles = list(filter(filter_vehicle, self.data))
+#		self.aircraft = list(filter(filter_aircraft, self.data))
+		self.engines = filt(Row.is_engine)
+		self.wagons = filt(Row.is_wagon)
+		self.vehicles = filt(Row.is_vehicle)
+		self.aircraft = filt(Row.is_aircraft)
 
-	def populate_table(self, table, labels, data):
-		table.setColumnCount(len(labels))
-		table.setHorizontalHeaderLabels(labels)
-		table.setRowCount(len(data))
-		table.setVerticalHeaderLabels([row[C.NAME] for row in data])
-		for r, v in enumerate(data):
+	@log_timer()
+	def populate_table(self, tbl, labels, d):
+		tbl.setColumnCount(len(labels))
+		l2 = [translate_header(l) for l in labels]
+		tbl.setHorizontalHeaderLabels(l2)
+		tbl.setRowCount(len(d))
+		tbl.setVerticalHeaderLabels([
+			self.data[row].get(C.NAME, self.data[row].get('name')) for row in d])
+		for r, i in enumerate(d):
 			for c, f in enumerate(labels):
-				if f == 'index':
-					item = QTableWidgetItem(('     '+str(v[f]))[-5:])
-				else:
-					item = QTableWidgetItem(str(rnd(v[f])))
-				if QFontMetrics(item.font()).horizontalAdvance(item.text()) > table.columnWidth(c):
-					item.setToolTip(str(rnd(v[f])))
-				table.setItem(r, c, item)
+				d = self.data[i][f]
+				txt = fmt_cell(f, d)
+				item = QTableWidgetItem(txt)
+				if len(txt) > 10:
+					item.setToolTip(txt)
+				tbl.setItem(r, c, item)
 				pls_help_bug.append(None)
-		h = table.horizontalHeader()
-		#h.sectionClicked.connect(self.reset_labels(table))
-		h.sortIndicatorChanged.connect(self.reset_labels(table))
+		h = tbl.horizontalHeader()
+		#h.sectionClicked.connect(self.reset_labels(tbl))
+		h.sortIndicatorChanged.connect(self.reset_labels(tbl))
 		h.hideSection(0)
-		table.sortItems(0, Qt.SortOrder.AscendingOrder)
+		tbl.sortItems(0, Qt.SortOrder.AscendingOrder)
 
 	@Slot()
+	#@log_timer()
+	def update_units(self):
+		unhidden_fields = []
+		hidden_fields = []
+		for i,fs in enumerate(self.speed_units):
+			if i == self.disp['unit']:
+				unhidden_fields += fs
+			else:
+				hidden_fields += fs
+		for tbl, labels, d in self.tables:
+			for i,l in enumerate(labels):
+				if l in unhidden_fields:
+					tbl.showColumn(i)
+				elif l in hidden_fields:
+					tbl.hideColumn(i)
+
+	def update_curs(self):
+		adj = adj_costs({cur: 1 for cur in C.CURRENCIES})
+		for cur in range(4):
+			self.ui.__getattribute__(f"lbl_adj_{currencies[cur]}").setText(
+				str(rnd(adj[cur])))
+		self.dirty = [True]*len(self.tables)
+
+	@Slot()
+	@log_timer()
 	def update_views(self):
 		if not self.populated:
 			return
+		self.update_curs()
 		counts = []
-		for r in range(len(self.data)):
-			self.data[r] = all_stats(self.data[r])
-		for tbl, labels, data in self.tables:
+		for idx in range(len(self.tables)):
+			self.dirty[idx] = False
+			tbl, labels, d = self.tables[idx]
+			idx_c = -1
+			for c,l in enumerate(labels):
+				if l == 'index':
+					idx_c = c
 			sort = tbl.isSortingEnabled()
 			tbl.setSortingEnabled(False)
 			count = 0
 			for r in range(tbl.rowCount()):
-				old = data[r].copy()
-				data[r] = all_stats(data[r])
-				row = data[r]
-				for c, f in enumerate(labels):
-					if row[f] != old[f]:
-						tbl.item(r,c).setText(str(rnd(row[f])))
-						tbl.item(r,c).setBackground(QColor.fromRgb(255, 224, 224))
+				for c in self.cur_idxs[idx]:
+					f = labels[c]
+					key = int(tbl.item(r,idx_c).text())
+					item = tbl.item(r,c)
+					new = fmt_cell(f, self.data[key][f])
+					old = item.text()
+					if new != old:
+						#print(f"{tbl.objectName()}item({r},{c}) '{new}' != '{old}'")
+						item.setText(new)
+						item.setBackground(pink)
 						count = count + 1
-					else:
-						tbl.item(r,c).setBackground(QBrush())
+					elif item.background() != QBrush():
+						item.setBackground(QBrush())
 					pls_help_bug.append(None)
 			counts.append(count)
 			if (sort):
@@ -133,17 +277,26 @@ class MainWindow(QMainWindow):
 		self.statusBar().showMessage("Updated " + ", ".join(
 			(str(c) for c in counts)) + " items")
 
+	@Slot(int)
+	def update_table(self, idx):
+		if idx >= len(self.tables) or not self.dirty[idx]:
+			return
+		self.update_views()
+		self.dirty[idx] = False
+
 	def reset_labels(self, tbl):
 		@Slot(int, Qt.SortOrder)
-		def impl(v, o):
+		#@log_timer(self)
+		def reset_labels_impl(v, o):
 			if self.populated:
 				print(f"reset({v}, {o})")
 			if v == -1:
 				tbl.sortItems(0, Qt.SortOrder.AscendingOrder)
 			tbl.sortItems(tbl.horizontalHeader().sortIndicatorSection(), o)
 			self.reset_labels_for(tbl)
-		return impl
+		return reset_labels_impl
 
+	#@log_timer()
 	def reset_labels_for(self, tbl):
 		van_idx = -1
 		name_idx = -1
@@ -174,26 +327,6 @@ class MainWindow(QMainWindow):
 						tbl.item(r, c).setBackground(QBrush())
 		return impl
 
-#		colors = [("Red", "#FF0000"),
-#		          ("Green", "#00FF00"),
-#		          ("Blue", "#0000FF"),
-#		          ("Black", "#000000"),
-#		          ("White", "#FFFFFF"),
-#		          ("Electric Green", "#41CD52"),
-#		          ("Dark Blue", "#222840"),
-#		          ("Yellow", "#F9E56d")]
-#		self.ui.tbl_engines.setRowCount(len(colors))
-#		self.ui.tbl_engines.setColumnCount(len(colors[0]) + 1)
-#		self.ui.tbl_engines.setHorizontalHeaderLabels(["Name", "Hex Code", "Color"])
-#		for i, (name, code) in enumerate(colors):
-#			item_name = QTableWidgetItem(name)
-#			item_code = QTableWidgetItem(code)
-#			item_color = QTableWidgetItem()
-#			item_color.setBackground(get_rgb_from_hex(code))
-#			self.ui.tbl_engines.setItem(i, 0, item_name)
-#			self.ui.tbl_engines.setItem(i, 1, item_code)
-#			self.ui.tbl_engines.setItem(i, 2, item_color)
-
 	@Slot()
 	def open(self):
 		print("open")
@@ -203,43 +336,43 @@ class MainWindow(QMainWindow):
 		if not self.populated:
 			return
 		token_supply[C.CASH] = val
-		print(token_supply)
-		self.update_views()
+		#print(token_supply)
+		self.update_curs()
 	@Slot(int)
 	def set_coal(self, val):
 		if not self.populated:
 			return
 		token_supply[C.COAL] = val
-		print(token_supply)
-		self.update_views()
+		#print(token_supply)
+		self.update_curs()
 	@Slot(int)
 	def set_diesel(self, val):
 		if not self.populated:
 			return
 		token_supply[C.DIESEL] = val
-		print(token_supply)
-		self.update_views()
+		#print(token_supply)
+		self.update_curs()
 	@Slot(int)
-	def set_electricity(self, val):
+	def set_electric(self, val):
 		if not self.populated:
 			return
 		token_supply[C.ELECTRIC] = val
-		print(token_supply)
-		self.update_views()
+		#print(token_supply)
+		self.update_curs()
 	@Slot(int)
 	def set_disp_unit(self, val):
 		if not self.populated:
 			return
 		self.disp["unit"] = val
-		print(self.disp)
-		self.update_views()
+		#print(self.disp)
+		self.update_units()
 	@Slot(int)
 	def set_disp_cmap(self, val):
 		if not self.populated:
 			return
 		self.disp["cmap"] = val
-		print(self.disp)
-		self.update_views()
+		#print(self.disp)
+		self.update_units()
 
 class Table:
 	pass
@@ -251,6 +384,7 @@ if __name__ == "__main__":
 
 	window = MainWindow(sys.argv)
 	window.show()
+	#window.update_views()
 
 	sys.exit(app.exec())
 

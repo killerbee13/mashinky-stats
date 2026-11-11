@@ -19,7 +19,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_2">
     <item row="1" column="0">
-     <widget class="QFrame" name="frame">
+     <widget class="QFrame" name="frame_search">
       <property name="frameShape">
        <enum>QFrame::NoFrame</enum>
       </property>
@@ -31,7 +31,7 @@
         <widget class="QLineEdit" name="lineEdit_search"/>
        </item>
        <item row="1" column="0">
-        <widget class="QLabel" name="label_search">
+        <widget class="QLabel" name="lbl_search">
          <property name="text">
           <string>Search</string>
          </property>
@@ -208,14 +208,14 @@
           </property>
           <layout class="QGridLayout" name="gridLayout_6">
            <item row="1" column="1">
-            <widget class="QLabel" name="label_coal">
+            <widget class="QLabel" name="lbl_coal">
              <property name="text">
               <string>Coal</string>
              </property>
             </widget>
            </item>
            <item row="2" column="3">
-            <widget class="QSpinBox" name="amt_electricity">
+            <widget class="QSpinBox" name="amt_electric">
              <property name="maximum">
               <number>10000</number>
              </property>
@@ -230,8 +230,21 @@
              </property>
             </widget>
            </item>
+           <item row="2" column="4">
+            <spacer name="horizontalSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
            <item row="1" column="0">
-            <widget class="QLabel" name="label_cash">
+            <widget class="QLabel" name="lbl_cash">
              <property name="text">
               <string>Cash</string>
              </property>
@@ -254,7 +267,7 @@
             </widget>
            </item>
            <item row="1" column="3">
-            <widget class="QLabel" name="label_electricity">
+            <widget class="QLabel" name="lbl_electric">
              <property name="text">
               <string>Electricity</string>
              </property>
@@ -277,7 +290,7 @@
             </widget>
            </item>
            <item row="1" column="2">
-            <widget class="QLabel" name="label_diesel">
+            <widget class="QLabel" name="lbl_diesel">
              <property name="text">
               <string>Diesel</string>
              </property>
@@ -302,18 +315,33 @@
              </property>
             </widget>
            </item>
-           <item row="2" column="4">
-            <spacer name="horizontalSpacer">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
+           <item row="3" column="0">
+            <widget class="QLabel" name="lbl_adj_cash">
+             <property name="text">
+              <string>TextLabel</string>
              </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QLabel" name="lbl_adj_coal">
+             <property name="text">
+              <string>TextLabel</string>
              </property>
-            </spacer>
+            </widget>
+           </item>
+           <item row="3" column="2">
+            <widget class="QLabel" name="lbl_adj_diesel">
+             <property name="text">
+              <string>TextLabel</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="3">
+            <widget class="QLabel" name="lbl_adj_electric">
+             <property name="text">
+              <string>TextLabel</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </widget>
@@ -443,7 +471,7 @@
             </widget>
            </item>
            <item row="4" column="0">
-            <widget class="QLabel" name="label_vdir">
+            <widget class="QLabel" name="lbl_vdir">
              <property name="text">
               <string>Vanilla directories</string>
              </property>
@@ -457,21 +485,21 @@
             </widget>
            </item>
            <item row="2" column="0">
-            <widget class="QLabel" name="label_others">
+            <widget class="QLabel" name="lbl_others">
              <property name="text">
               <string>Mod files</string>
              </property>
             </widget>
            </item>
            <item row="0" column="0">
-            <widget class="QLabel" name="label_moddir">
+            <widget class="QLabel" name="lbl_moddir">
              <property name="text">
               <string>Mods folder</string>
              </property>
             </widget>
            </item>
            <item row="6" column="0">
-            <widget class="QLabel" name="label_vfiles">
+            <widget class="QLabel" name="lbl_vfiles">
              <property name="text">
               <string>Vanilla files</string>
              </property>
@@ -505,7 +533,7 @@
      </widget>
     </item>
     <item row="4" column="0">
-     <widget class="QLabel" name="label">
+     <widget class="QLabel" name="vis_cmap">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
         <horstretch>100</horstretch>
@@ -721,14 +749,30 @@
    </hints>
   </connection>
   <connection>
-   <sender>amt_electricity</sender>
+   <sender>amt_electric</sender>
    <signal>valueChanged(int)</signal>
    <receiver>MainWindow</receiver>
-   <slot>set_electricity(int)</slot>
+   <slot>set_electric(int)</slot>
    <hints>
     <hint type="sourcelabel">
      <x>259</x>
      <y>136</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>591</x>
+     <y>390</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>tabWidget</sender>
+   <signal>currentChanged(int)</signal>
+   <receiver>MainWindow</receiver>
+   <slot>update_table(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>591</x>
+     <y>351</y>
     </hint>
     <hint type="destinationlabel">
      <x>591</x>
@@ -742,12 +786,13 @@
   <slot>set_cash(int)</slot>
   <slot>set_coal(int)</slot>
   <slot>set_diesel(int)</slot>
-  <slot>set_electricity(int)</slot>
+  <slot>set_electric(int)</slot>
   <slot>set_disp_unit(int)</slot>
   <slot>set_disp_cmap(int)</slot>
   <slot>set_moddir(str)</slot>
   <slot>set_files(str)</slot>
   <slot>tbl_click(int,int)</slot>
   <slot>set_sortable(int)</slot>
+  <slot>update_table(int)</slot>
  </slots>
 </ui>

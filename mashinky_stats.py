@@ -32,6 +32,7 @@ safe_div = lambda a, b: a/b if b else 0.
 class FieldBase:
 	csv: Optional[str]
 	tbl: Optional[str]
+	owner: None
 class KeyBase(FieldBase):
 	xml: Optional[str]
 	_key_name: str
@@ -46,6 +47,7 @@ def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
 	csv_ = csv
 	tbl_ = otherwise(tbl, csv_)
 	xml_ = xml
+
 	class Key(KeyBase):
 		owner = None
 		def __init__(self):
@@ -58,38 +60,23 @@ def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
 				object.__setattr__(self, 'owner', owner)
 			object.__setattr__(self, '_key_name', name)
 			if default is not Default:
+				if type(default) is U or type(default) in typing.get_args(U) or U is Any:
+					object.__setattr__(self, 'default', default)
+				else:
+					object.__setattr__(self, 'default', U(default))
 				#print(f"setting default={repr(default)}, csv={csv_}, tbl={tbl_}")
-				object.__setattr__(self, 'default', default)
+				#object.__setattr__(self, 'default', default)
+			else:
+				object.__setattr__(self, 'default', Default)
 			owner.__annotations__[name] = U
 		def _key(self):
 			return f"key-{self._key_name}"
-		def __get__(self, obj, owner=None):
-			def fmt_key(k):
-				if k.is_default():
-					return f"Key({self._key_name}, {repr(k.csv)}, {repr(k.tbl)}, xml={repr(k.xml)}, default={repr(k.default)}, owner={repr(k.owner)})"
-				else:
-					return f"Key({self._key_name}, {repr(k.csv)}, {repr(k.tbl)}, xml={repr(k.xml)}, owner={repr(k.owner)})"
-			#print(fmt_key(self), f"<class {repr(type(obj).__name__)}>", repr(owner), sep=';')
-			if obj is not None:
-				try:
-					if self._key() in obj.__dict__:
-						return obj.__dict__[self._key()]
-					elif self.is_default(obj):
-						if type(self.default) is U or type(self.default) in typing.get_args(U):
-							return self.default
-						else:
-							return U(self.default)
-					else:
-						raise AttributeError(f"'{owner.__name__}' field '{self._key_name}' unset")
-				except KeyError as e:
-					raise AttributeError(f"'{owner.__name__}' field '{self._key_name}' unset") from e
-			else:
-				return self
 		def is_default(self, *args):
 			if not args:
-				return hasattr(self, 'default')
+				return default is not Default
 			else:
-				return self._key() not in args[0].__dict__ and hasattr(self, 'default')
+				return (self._key() not in args[0].__dict__
+					and default is not Default)
 		def __repr__(self):
 			if self.owner:
 				try:
@@ -98,8 +85,9 @@ def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
 				except AttributeError:
 					return f"<Key {self._key_name}=unset>"
 			else:
-				return (f"<Key '{self._key_name}'('{self.csv}', '{self.tbl}', xml='{self.xml}'"
-					+ (f", default={default})>" if default is not Default else ")>"))
+				return (f"<Key '{self._key_name}'({repr(self.csv)}, "
+					f"{repr(self.tbl)}, xml={repr(self.xml)}"
+					+ (f", default={repr(default)})>" if default is not Default else ")>"))
 		def __set__(self, obj, value):
 			#print(repr(self), repr(obj), repr(value), sep=';')
 			obj.__dict__[self._key()] = value
@@ -107,8 +95,32 @@ def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
 			raise AttributeError(f"Key.{name}={value}: Keys are immutable")
 		def __delattr__(self, name):
 			raise AttributeError(f"del Key.{name}: Keys are immutable")
-	k = Key()
-	return k
+	#def fmt_key(k):
+	#	if k.is_default():
+	#		return f"Key({self._key_name}, {repr(k.csv)}, {repr(k.tbl)}, xml={repr(k.xml)}, default={repr(k.default)}, owner={repr(k.owner)})"
+	#	else:
+	#		return f"Key({self._key_name}, {repr(k.csv)}, {repr(k.tbl)}, xml={repr(k.xml)}, owner={repr(k.owner)})"
+	if default is Default:
+		def __get__(self, obj, owner=None):
+			#print(fmt_key(self), f"<class {repr(type(obj).__name__)}>", repr(owner), sep=';')
+			if obj is not None:
+				try:
+					return obj.__dict__[self._key()]
+				except KeyError as e:
+					raise AttributeError(
+						f"'{owner.__name__}' field '{self._key_name}' unset") from e
+			else:
+				return self
+		Key.__get__ = __get__
+	else:
+		def __get__(self, obj, owner=None):
+			#print(fmt_key(self), f"<class {repr(type(obj).__name__)}>", repr(owner), sep=';')
+			if obj is not None:
+				return obj.__dict__.get(self._key(), self.default)
+			else:
+				return self
+		Key.__get__ = __get__
+	return Key()
 def default_field(*args, xml=None):
 	return field(*args, xml=xml, default=None)
 def zero_field(*args, xml=None):
@@ -125,14 +137,15 @@ def generated(first, *args, **kwargs):
 	@generated(csv_: str, tbl_: Optional[str] = Default):
 		decorator version of the above"""
 	def impl(fun: types.FunctionType, csv_: Optional[str], tbl_: Optional[str] = Default):
-		class Key(FieldBase):
+		class Gen(FieldBase):
+			owner = None
 			def __init__(self):
 				object.__setattr__(self,'csv', csv_)
 				object.__setattr__(self,'tbl', otherwise(tbl_, csv_))
-				def __set_name__(self, owner, name):
-					if not isinstance(owner, type):
-						object.__setattr__(self, 'owner', owner)
-					object.__setattr__(self, '_key_name', name)
+			def __set_name__(self, owner, name):
+				if not isinstance(owner, type):
+					object.__setattr__(self, 'owner', owner)
+				object.__setattr__(self, '_key_name', name)
 			def __get__(self, obj, owner=None):
 				#print(repr(self), repr(obj), repr(owner), sep=';')
 				if obj is not None:
@@ -142,21 +155,22 @@ def generated(first, *args, **kwargs):
 			def is_default(self, *args):
 				return True
 			def __repr__(self):
+				#print(f"<Gen '{self._key_name}'('{self.csv}', '{self.tbl}')>")
 				if self.owner:
 					try:
 						value = self.__get__(self.owner, type(self.owner))
-						return f"<Key {self._key_name}={repr(value)}>"
+						return f"<Gen {self._key_name}={repr(value)}>"
 					except AttributeError:
-						return f"<Key {self._key_name}=unset>"
+						return f"<Gen {self._key_name}=unset>"
 				else:
-					return f"<Key '{self._key_name}'('{self.csv}', '{self.tbl}')>"
+					return f"<Gen '{self._key_name}'('{self.csv}', '{self.tbl}')>"
 			def __set__(self, obj, value):
 				raise AttributeError(f"{obj}.key-{self.csv}={value}: Generated fields cannot be assigned")
 			def __setattr__(self, name, value):
-				raise AttributeError(f"Key.{name}={value}: Keys are immutable")
+				raise AttributeError(f"Gen.{name}={value}: Gens are immutable")
 			def __delattr__(self, name):
-				raise AttributeError(f"del Key.{name}: Keys are immutable")
-		return Key()
+				raise AttributeError(f"del Gen.{name}: Gens are immutable")
+		return Gen()
 	if type(first) == str:
 		return lambda f: impl(f, first, *args, **kwargs)
 	elif callable(first):
@@ -174,6 +188,12 @@ def finalize(cls):
 		else:
 			raise KeyError(f"{repr(field)} not in {cls.__name__}")
 	cls.__getitem__ = subscript
+	def get(self, field, fallback=None):
+		try:
+			return self[field]
+		except KeyError:
+			return fallback
+	cls.get = get
 	def contains(self, field):
 		if field not in cls.__dict__:
 			return False
@@ -222,7 +242,7 @@ def finalize(cls):
 		for k,v in kwargs.items():
 			if k in fields:
 				if v is not Default:
-					self.__setattr__(k, v)
+					self.__setattr__(k, cls.__annotations__[k](v))
 					del fields[k]
 				else:
 					if not cls.__dict__[k].is_default():
@@ -256,7 +276,15 @@ def finalize(cls):
 			for k,v in obj.copy().items():
 				for f,ks in fields.items():
 					if ks[attr] == k:
-						r.__setattr__(f,v)
+#						if type(self.default) is U or type(self.default) in typing.get_args(U):
+#							return self.default
+#						else:
+#							return U(self.default)
+						U = cls.__annotations__[f]
+						if type(v) is U or type(v) in typing.get_args(U) or U is Any:
+							r.__setattr__(f, v)
+						else:
+							r.__setattr__(f,U(v))
 						# safe because the loop ends at the break
 						del fields[f]
 						# safe because of the copy() call
@@ -275,7 +303,7 @@ def finalize(cls):
 				# fields currently holds all fields which were not in obj
 				# f2 holds all fields not in kwargs
 				for k,v in fields.items():
-					if not hasattr(v, 'default') and k in f2:
+					if not cls.__getattribute__(v).is_default() and k in f2:
 						to_see.append(k)
 				if to_see:
 					raise ValueError(f"{cls.__name__}.from_{attr}(): "\
@@ -302,6 +330,9 @@ def finalize(cls):
 					out |= {f: self[f]}
 		return out
 	cls.asdict = asdict
+	def keys():
+		return list(out_fields)
+	cls.keys = staticmethod(keys)
 	return cls
 
 @finalize
@@ -315,12 +346,12 @@ class test:
 class Row:
 	# XML/core properties: (in XML, shown in game, or very trivially derived)
 	#   Common:
-	index = table_field(int, 'index')
+	name = field(str, C.NAME, xml='name')
+	index = table_field(int, 'Index')
 	source = table_field(Path, C.SOURCE, default='')
 	vanilla = table_field(bool, C.VANILLA, default=False)
-	id = table_field(str, C.ID, xml=C.ID, default='')
-	cid = default_field(Optional[str], C.CID, xml='cargo')
-	name = field(str, C.NAME, xml='name')
+	id = table_field(str, 'ID', xml=C.ID, default='')
+	cid = default_field(Optional[str], C.CID, 'Cargo ID', xml='cargo')
 	vehicle_type = table_field(int, 'vehicle_type', xml='vehicle_type')
 	track = zero_field(int, None, C.TRACK, xml='track')
 	weight_full = field(float, C.WEIGHT_FULL, xml='weight_full')
@@ -336,24 +367,32 @@ class Row:
 	length_tail = zero_field(float, None, xml='tail_length')
 	length = generated(lambda r: r.length_b + r.length_head + r.length_tail, C.LENGTH)
 
-	cost = table_field(dict[str, float], C.COSTS_RAW, xml='fuel_cost', default={})
-	cash = generated(lambda r: r.cost.get(C.CASH, 0.), C.CASH)
-	coal = generated(lambda r: r.cost.get(C.COAL, 0.), C.COAL)
-	diesel = generated(lambda r: r.cost.get(C.DIESEL, 0.), C.DIESEL)
-	electric = generated(lambda r: r.cost.get(C.ELECTRIC, 0.), C.ELECTRIC)
-
 	#   Prime movers:
 	power = field(float, C.POWER, xml='power', default=0.)
 	max_speed = field(float, C.SPEED, xml='max_speed', default=0.)
-	max_speed_reverse = zero_field(float, None, "Reverse speed (km/hr)", xml='max_speed_reverse')
-	max_speed_mph = generated(lambda r: round(r.max_speed/C.KM_PER_MI), C.SPEED_MPH)
-	max_speed_reverse_mph = generated(lambda r: round(r.max_speed_reverse/C.KM_PER_MI), "Reverse speed (mph)")
+	max_speed_mph = generated(lambda r: r.max_speed/C.KM_PER_MI, C.SPEED_MPH)
+	max_speed_reverse = zero_field(Any, None, "Reverse speed (km/hr)", xml='max_speed_reverse')
+	@generated("Reverse speed (mph)")
+	def max_speed_reverse_mph(self):
+		if type(self.max_speed_reverse) is float:
+			return round(self.max_speed_reverse/C.KM_PER_MI)
+		else:
+			return self.max_speed_reverse
 	weight = generated(lambda r: r.weight_full, C.WEIGHT)
 	@generated(C.TRACTION)
 	def traction(self):
 		return math.floor(safe_div(self.power*C.TRACTION_SCALE, self.max_speed))
 	towage = generated(lambda r: r.traction - r.weight_full, C.TOWAGE)
 	throughput = generated(lambda r: r.towage*r.max_speed, C.THROUGHPUT)
+
+	# Fuel
+	raw_cost = table_field(str, None, xml='fuel_cost', default='')
+	cost = generated(lambda r: costs(r.raw_cost), C.COSTS_RAW)
+	cash = generated(lambda r: r.cost.get(C.CASH, 0.), C.CASH)
+	coal = generated(lambda r: r.cost.get(C.COAL, 0.), C.COAL)
+	diesel = generated(lambda r: r.cost.get(C.DIESEL, 0.), C.DIESEL)
+	electric = generated(lambda r: r.cost.get(C.ELECTRIC, 0.), C.ELECTRIC)
+	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST)
 
 	#   Cargo carriers:
 	capacity = zero_field(int, C.CARGO, xml='capacity')
@@ -395,13 +434,11 @@ class Row:
 	profit_throughput = generated(lambda r: r.profit*r.max_speed, C.TP_PROFIT)
 
 	#   Fuel:
-	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST)
-
 	def _TP(self, c: str, t: float) -> float:
 		if self.power and self.cost.get(c):
 			return t/(self.cost.get(c, 0)*fixed_scale[c])
 		else:
-			return 0.
+			return ''
 	def TP_ac(self, t: float) -> float:
 		return self.adjcost and t/(self.adjcost*adj_scale)
 	def TP(self, cur: str) -> float:
@@ -411,11 +448,11 @@ class Row:
 	def TPp(self, cur: str) -> float:
 		return self._TP(cur, self.profit_throughput)
 
-	tp_adjcost = generated(lambda r: r.TP_ac(r.throughput), C.TP_ADJCOST)
-	tp_cash = generated(lambda r: r.TP(C.CASH), C.TP_CASH)
-	tp_coal = generated(lambda r: r.TP(C.COAL), C.TP_COAL)
-	tp_diesel = generated(lambda r: r.TP(C.DIESEL), C.TP_DIESEL)
-	tp_electric = generated(lambda r: r.TP(C.ELECTRIC), C.TP_ELECTRIC)
+	TP_adjcost = generated(lambda r: r.TP_ac(r.throughput), C.TP_ADJCOST)
+	TP_cash = generated(lambda r: r.TP(C.CASH), C.TP_CASH)
+	TP_coal = generated(lambda r: r.TP(C.COAL), C.TP_COAL)
+	TP_diesel = generated(lambda r: r.TP(C.DIESEL), C.TP_DIESEL)
+	TP_electric = generated(lambda r: r.TP(C.ELECTRIC), C.TP_ELECTRIC)
 
 	TPc_adjcost = generated(lambda r: r.TP_ac(r.cargo_throughput), C.TPC_ADJCOST)
 	TPp_adjcost = generated(lambda r: r.TP_ac(r.profit_throughput), C.TPP_ADJCOST)
@@ -443,6 +480,23 @@ class Row:
 	def cargo_unit_wt(self):
 		return safe_div(self.weight_full-self.weight_empty, self.capacity)
 
+	def is_engine(self):
+		return self.vehicle_type == 0 and self.cost
+	def is_wagon(self):
+		return self.vehicle_type == 0 and self.capacity
+	def is_vehicle(self):
+		return self.vehicle_type == 1
+	def is_aircraft(self):
+		return self.vehicle_type == 3
+
+def compare(row1, row2, fields):
+	for f in fields:
+		if row1[f] < row2[f]:
+			return True
+		elif row2[f] < row1[f]:
+			return False
+	return False
+
 time_speed = 0.33
 tick_rate = 0.1
 token_supply = {
@@ -469,8 +523,8 @@ cargo_by_label = {
 def rnd(x: T, recip_tol=100) -> T:
 	return math.floor(x*recip_tol)/recip_tol if type(x) is float else x
 
-def costs(train: dict[Any, Any]) -> dict[str, float]:
-	raw = re.findall(r'-([0-9.]+)(?:\[([^[]+)\])?;?', train['fuel_cost'])
+def costs(raw: str) -> dict[str, float]:
+	raw = re.findall(r'-([0-9.]+)(?:\[([^[]+)\])?;?', raw)
 	return {token_by_label.get(t, C.CASH): float(x) for x, t in raw}
 
 def adj_costs(cost: dict[str, float]) -> list[float]:
@@ -514,7 +568,7 @@ def all_stats(vehicle: dict[Any, Any], filename: Path = None, vanilla: bool = No
 			+ float(vehicle.get('tail_length', 0))
 		)
 		
-		cost = costs(vehicle) if vehicle.get('fuel_cost') else {}
+		cost = costs(vehicle['fuel_cost']) if vehicle.get('fuel_cost') else {}
 		adjcost = cost_adj(cost)
 		effect = re.fullmatch(r'(?:profit\[[^]]*\])\*([0-9]*.?[0-9]*)',
 			vehicle.get('effect', ""))
@@ -647,7 +701,7 @@ train_row_labels = [
 	C.PWT_EMPTY, C.PWT_FULL, C.TOW_PER_LENGTH, C.POWER_PER_LENGTH, C.THROUGHPUT,
 	C.CD6, C.CD8, C.SPEED_MPH,
 	C.TP_CASH, C.TP_COAL, C.TP_DIESEL, C.TP_ELECTRIC,
-	C.CASH, C.COAL, C.DIESEL, C.ELECTRIC,
+	]+C.CURRENCIES+[
 	C.TP_ADJCOST, C.ADJCOST, # C.COSTS_RAW,
 	C.ERAS, C.ID, C.SOURCE
 ]
@@ -671,7 +725,7 @@ vehicle_row_labels = [
 	C.LENGTH, C.ERA, C.BONUS, C.PWT_EMPTY, C.PWT_FULL, C.THROUGHPUT, C.TP_CARGO,
 	C.CARGO_PER_LENGTH, C.PROFITABILITY, C.PROFIT_PER_LENGTH, C.CARGO_UNIT_WT,
 	C.SPEED_MPH,
-	C.CASH, C.COAL, C.DIESEL, C.ELECTRIC, C.ADJCOST,
+	]+C.CURRENCIES+[ C.ADJCOST,
 	C.TP_ADJCOST, C.TP_CASH, C.TP_COAL, C.TP_DIESEL, C.TP_ELECTRIC,
 	C.TPC_ADJCOST, C.TPC_CASH, C.TPC_COAL, C.TPC_DIESEL, C.TPC_ELECTRIC,
 	C.TPP_ADJCOST, C.TPP_CASH, C.TPP_COAL, C.TPP_DIESEL, C.TPP_ELECTRIC,
@@ -730,7 +784,7 @@ def compare_exp_val(val, exp, field):
 def compare_vehicle(vehicle, expected, label, fields, elementary_fields, fmt, out):
 	if expected is None:
 		print(
-			f"{label} new: {fmt(vehicle)} ID={vehicle[C.ID]}:{vehicle['source']}",
+			f"{label} new: {fmt(vehicle)} ID={vehicle[C.ID]}:{vehicle[C.SOURCE]}",
 			file=out)
 	elif vehicle is None:
 		if not '*' in expected[C.NAME]:
@@ -750,7 +804,7 @@ def compare_vehicle(vehicle, expected, label, fields, elementary_fields, fmt, ou
 		if discrepancy:
 			print(
 				f"{label} diff: got ({fmt(vehicle)}) expected ({fmt(expected)}) "
-				f"ID={vehicle[C.ID]}:{vehicle['source']}",
+				f"ID={vehicle[C.ID]}:{vehicle[C.SOURCE]}",
 				file=out)
 			print("\t" + "; ".join(
 				["{}{}:{},{}".format("!" if f in elementary_fields else "=",
@@ -798,15 +852,25 @@ def read_files(files, vfiles):
 	def impl(files, vanilla):
 		nonlocal idx
 		out = []
+		out2 = []
 		for file in files:
 			dom = BeautifulSoup(slurp(file), "lxml")
 			for tag in dom.find_all('wagontype'):
 				row = all_stats(tag.attrs, file, vanilla)
 				row['index'] = idx
+				try:
+					out2.append(Row.from_xml(tag.attrs, source=file, vanilla=vanilla, index=idx))
+				except ValueError as e:
+					e.add_note(repr(tag.attrs))
+					e.add_note(repr(file))
+					raise
+				#print(out2[-1].asdict(False))
 				idx = idx + 1
 				out.append(row)
-		return out
-	return impl(vfiles, True) + impl(files, False)
+		return out,out2
+	v1,v2 = impl(vfiles, True)
+	t1,t2 = impl(files, False)
+	return (v1+t1), (v2+t2)
 
 
 def process_files(table, out, msg, fields, pred, exp, comp, exp_out):
@@ -851,7 +915,7 @@ def filter_aircraft(a):
 	return int(a['vehicle_type']) == 3
 
 def run(files, vfiles, train_out, wagon_out, vehicle_out, aircraft_out, univ_out, expected_trains, expected_wagons, unexpected_outstream):
-	table = read_files(files, vfiles)
+	table,t2 = read_files(files, vfiles)
 
 	process_files(table, train_out, "Trains:", train_row_labels,
 		filter_engine,
@@ -896,7 +960,6 @@ def make_arg_parser(gui):
 		parser.add_argument('-a', '--aircraft_out', default='-')
 		parser.add_argument('-u', '--univ_out')
 		parser.add_argument('-d', '--unexpected_out', default='-')
-	parser.add_argument('--props', default=None)
 	return parser
 
 def find_files(files, paths):
@@ -925,33 +988,6 @@ def read_incomes(income):
 		raise ValueError("Could not parse --income argument: "
 			+ repr(income))
 
-def generate_props(props):
-	with open(props, 'w') as p:
-		lookup = {str(v): k for k, v in C.__dict__.items()}
-		fix = lambda s, n: 'C.' + n if n is not None else repr(s)
-		print("""from dataclasses import dataclass
-from enum import Enum, auto
-import constants as C
-
-class Highlight(Enum):
-	NONE = auto()
-	HIGH = auto()
-	LOW = auto()
-	PARITY = auto()
-
-@dataclass(kw_only=True, frozen=True)
-class ColProps:
-	type: type
-	highlight: Highlight = Highlight.NONE
-	generated: bool = True
-	hidden: bool = False
-
-""", end='', file=p)
-		print('props = {', file=p)
-		for c, d in ({'index': 0} | null_row).items():
-			print(f"\t{fix(c, lookup.get(c, None))}: ColProps(type={type(d).__name__}),", file=p)
-		print('}', file=p)
-
 def handle_cli(gui):
 	warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 	parser = make_arg_parser(gui)
@@ -961,9 +997,6 @@ def handle_cli(gui):
 
 	if args.income:
 		read_incomes(args.income)
-
-	if args.props:
-		generate_props(args.props)
 
 	return args, files, vfiles
 

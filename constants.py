@@ -10,8 +10,8 @@ TRACTION_SCALE = 42.1
 # technical
 ID = "id"
 CID = "cargo id"
-SOURCE = "source"
-VANILLA = "vanilla"
+SOURCE = "Source"
+VANILLA = "Vanilla"
 # common
 NAME = "Name"
 LENGTH = "Length (u)"
@@ -79,6 +79,7 @@ CASH = "Cash"
 COAL = "Coal"
 DIESEL = "Diesel"
 ELECTRIC = "Electric"
+CURRENCIES = [CASH, COAL, DIESEL, ELECTRIC]
 
 # Cargo types
 # coal, diesel already covered
