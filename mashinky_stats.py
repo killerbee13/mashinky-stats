@@ -33,6 +33,8 @@ class FieldBase:
 	csv: Optional[str]
 	tbl: Optional[str]
 	owner: None
+	def _key(self):
+		return f"key-{self._key_name}"
 class KeyBase(FieldBase):
 	xml: Optional[str]
 	_key_name: str
@@ -69,8 +71,6 @@ def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
 			else:
 				object.__setattr__(self, 'default', Default)
 			owner.__annotations__[name] = U
-		def _key(self):
-			return f"key-{self._key_name}"
 		def is_default(self, *args):
 			if not args:
 				return default is not Default
@@ -91,6 +91,7 @@ def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
 		def __set__(self, obj, value):
 			#print(repr(self), repr(obj), repr(value), sep=';')
 			obj.__dict__[self._key()] = value
+			obj._gen_cache = {}
 		def __setattr__(self, name, value):
 			raise AttributeError(f"Key.{name}={value}: Keys are immutable")
 		def __delattr__(self, name):
@@ -103,21 +104,20 @@ def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
 	if default is Default:
 		def __get__(self, obj, owner=None):
 			#print(fmt_key(self), f"<class {repr(type(obj).__name__)}>", repr(owner), sep=';')
-			if obj is not None:
-				try:
-					return obj.__dict__[self._key()]
-				except KeyError as e:
-					raise AttributeError(
-						f"'{owner.__name__}' field '{self._key_name}' unset") from e
-			else:
+			try:
+				return obj.__dict__[self._key()]
+			except KeyError as e:
+				raise AttributeError(
+					f"'{owner.__name__}' field '{self._key_name}' unset") from e
+			except AttributeError:
 				return self
 		Key.__get__ = __get__
 	else:
 		def __get__(self, obj, owner=None):
 			#print(fmt_key(self), f"<class {repr(type(obj).__name__)}>", repr(owner), sep=';')
-			if obj is not None:
+			try:
 				return obj.__dict__.get(self._key(), self.default)
-			else:
+			except AttributeError:
 				return self
 		Key.__get__ = __get__
 	return Key()
@@ -129,6 +129,14 @@ def table_field(U: T, tbl: str, /, xml : Optional[str] = None,
 	default: Optional[T] = Default):
 	"""For fields which are not in the CSV but are in the table"""
 	return field(U, None, tbl, xml=xml, default=default)
+def xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default,
+	default: Optional[T] = Default):
+	"""Non-CSV fields"""
+	return field(U, None, tbl, xml=xml, default=default)
+def zero_xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default):
+	return field(U, None, tbl, xml=xml, default=0)
+def default_xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default):
+	return field(U, None, tbl, xml=xml, default=None)
 
 def generated(first, *args, **kwargs):
 	"""Generates a field from others. Cannot have an xml key.
@@ -136,7 +144,7 @@ def generated(first, *args, **kwargs):
 		Value of obj.gen is computed as fun(obj). tbl defaults to csv
 	@generated(csv_: str, tbl_: Optional[str] = Default):
 		decorator version of the above"""
-	def impl(fun: types.FunctionType, csv_: Optional[str], tbl_: Optional[str] = Default):
+	def impl(fun: types.FunctionType, csv_: Optional[str], tbl_: Optional[str] = Default, cache=True):
 		class Gen(FieldBase):
 			owner = None
 			def __init__(self):
@@ -146,12 +154,6 @@ def generated(first, *args, **kwargs):
 				if not isinstance(owner, type):
 					object.__setattr__(self, 'owner', owner)
 				object.__setattr__(self, '_key_name', name)
-			def __get__(self, obj, owner=None):
-				#print(repr(self), repr(obj), repr(owner), sep=';')
-				if obj is not None:
-					return fun(obj)
-				else:
-					return self
 			def is_default(self, *args):
 				return True
 			def __repr__(self):
@@ -165,11 +167,31 @@ def generated(first, *args, **kwargs):
 				else:
 					return f"<Gen '{self._key_name}'('{self.csv}', '{self.tbl}')>"
 			def __set__(self, obj, value):
-				raise AttributeError(f"{obj}.key-{self.csv}={value}: Generated fields cannot be assigned")
+				raise AttributeError(f"{obj}.key-{self._key_name}={value}: Generated fields cannot be assigned")
 			def __setattr__(self, name, value):
 				raise AttributeError(f"Gen.{name}={value}: Gens are immutable")
 			def __delattr__(self, name):
 				raise AttributeError(f"del Gen.{name}: Gens are immutable")
+		if cache:
+			def __get__(self, obj, owner=None):
+				#print(repr(self), repr(obj), repr(owner), sep=';')
+				try:
+					return obj._gen_cache[self._key_name]
+				except KeyError:
+					ret = fun(obj)
+					obj._gen_cache[self._key_name] = ret
+					return ret
+				except AttributeError:
+					return self
+			Gen.__get__ = __get__
+		else:
+			def __get__(self, obj, owner=None):
+				#print(repr(self), repr(obj), repr(owner), sep=';')
+				if obj is not None:
+					return fun(obj)
+				else:
+					return self
+			Gen.__get__ = __get__
 		return Gen()
 	if type(first) == str:
 		return lambda f: impl(f, first, *args, **kwargs)
@@ -217,7 +239,7 @@ def finalize(cls):
 			return "unset"
 	cls.field_rep = field_rep
 	def rep(self):
-		rep = ", ".join((f"{k[0]}={self.field_rep(k[0])}" for k in dict(vars(cls)).items()
+		rep = ", ".join((f"{k[0]}={self.field_rep(k[0])}" for k in dict(cls.__dict__).items()
 			if isinstance(k[1], KeyBase) and k[0] in self))
 		return f"{type(self).__name__}({rep})"
 	cls.__repr__ = rep
@@ -225,7 +247,7 @@ def finalize(cls):
 
 	init_fields = {}
 	out_fields = {}
-	for k,v in dict(vars(cls)).items():
+	for k,v in dict(cls.__dict__).items():
 		if isinstance(v, FieldBase):
 			f = {'csv': v.csv, 'tbl': v.tbl}
 			if isinstance(v, KeyBase):
@@ -257,6 +279,7 @@ def finalize(cls):
 			return None
 	cls.assign_args = assign_args
 	def init(self, strict=False, **kwargs):
+		self._gen_cache = {}
 		fields = self.assign_args(strict=strict, **kwargs)
 		if fields:
 			raise ValueError(f"{cls.__name__}.from_args(): "\
@@ -266,7 +289,7 @@ def finalize(cls):
 		init(r)
 		return r
 	cls.from_args = classmethod(from_args)
-	if '__init__' not in vars(cls):
+	if '__init__' not in cls.__dict__:
 		cls.__init__ = init
 	def from_(attr, fields_):
 		def impl(cls, obj_, /, strict=False, **kwargs):
@@ -360,11 +383,13 @@ class Row:
 	eras = generated(lambda r: parse_eras(r.epoch), C.ERAS)
 	era = generated(lambda r: r.eras[0], C.ERA)
 
-	icon = table_field(str, "Icon", xml='icon', default="")
+	icon = xml_field(str, 'icon', default="")
+	icon_texture = xml_field(str, 'icon_texture', default="")
+	icon_color = xml_field(str, 'icon_color', default="")
 
-	length_b = zero_field(float, None, xml='length')
-	length_head = zero_field(float, None, xml='head_length')
-	length_tail = zero_field(float, None, xml='tail_length')
+	length_b = zero_xml_field(float, 'length')
+	length_head = zero_xml_field(float, 'head_length')
+	length_tail = zero_xml_field(float, 'tail_length')
 	length = generated(lambda r: r.length_b + r.length_head + r.length_tail, C.LENGTH)
 
 	#   Prime movers:
@@ -392,7 +417,7 @@ class Row:
 	coal = generated(lambda r: r.cost.get(C.COAL, 0.), C.COAL)
 	diesel = generated(lambda r: r.cost.get(C.DIESEL, 0.), C.DIESEL)
 	electric = generated(lambda r: r.cost.get(C.ELECTRIC, 0.), C.ELECTRIC)
-	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST)
+	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST, cache=False)
 
 	#   Cargo carriers:
 	capacity = zero_field(int, C.CARGO, xml='capacity')
@@ -405,7 +430,7 @@ class Row:
 			elif ct == C.MAIL:
 				return "Mail Engine"
 		return ct
-	raw_effect = field(str, None, xml='effect', default="")
+	raw_effect = xml_field(str, 'effect', default="")
 	@generated('Effect')
 	def effect(self):
 		effect = re.fullmatch(r'(?:profit\[[^]]*\])\*([0-9]*.?[0-9]*)',
@@ -456,14 +481,14 @@ class Row:
 	def TPp(self, cur: str) -> float:
 		return self._TP(cur, self.profit_throughput)
 
-	TP_adjcost = generated(lambda r: r.TP_ac(r.throughput), C.TP_ADJCOST)
+	TP_adjcost = generated(lambda r: r.TP_ac(r.throughput), C.TP_ADJCOST, cache=False)
 	TP_cash = generated(lambda r: r.TP(C.CASH), C.TP_CASH)
 	TP_coal = generated(lambda r: r.TP(C.COAL), C.TP_COAL)
 	TP_diesel = generated(lambda r: r.TP(C.DIESEL), C.TP_DIESEL)
 	TP_electric = generated(lambda r: r.TP(C.ELECTRIC), C.TP_ELECTRIC)
 
-	TPc_adjcost = generated(lambda r: r.TP_ac(r.cargo_throughput), C.TPC_ADJCOST)
-	TPp_adjcost = generated(lambda r: r.TP_ac(r.profit_throughput), C.TPP_ADJCOST)
+	TPc_adjcost = generated(lambda r: r.TP_ac(r.cargo_throughput), C.TPC_ADJCOST, cache=False)
+	TPp_adjcost = generated(lambda r: r.TP_ac(r.profit_throughput), C.TPP_ADJCOST, cache=False)
 	TPc_cash = generated(lambda r: r.TPc(C.CASH), C.TPC_CASH)
 	TPp_cash = generated(lambda r: r.TPp(C.CASH), C.TPP_CASH)
 	TPc_coal = generated(lambda r: r.TPc(C.COAL), C.TPC_COAL)
@@ -496,6 +521,15 @@ class Row:
 		return self.vehicle_type == 1
 	def is_aircraft(self):
 		return self.vehicle_type == 3
+
+@finalize
+class tcoords:
+	source = field(Path, 'source', C.SOURCE, default='')
+	id = xml_field(str, 'id')
+	x = xml_field(int, 'x')
+	y = xml_field(int, 'y')
+	w = xml_field(int, 'w')
+	h = xml_field(int, 'h')
 
 def compare(row1, row2, fields):
 	for f in fields:
@@ -653,7 +687,7 @@ def compare_exp_val(val, exp, field):
 		return val == exp
 
 def key_to_csv(field):
-	return vars(Row)[field].csv
+	return Row.__dict__[field].csv
 def keys_to_csv(fields):
 	return [key_to_csv(field) for field in fields]
 def exp_name_key(name):
@@ -735,22 +769,28 @@ def compare_wagon(vehicle, expected, out):
 
 def read_files(files, vfiles):
 	idx = 0
+	coords = {}
 	def impl(files, vanilla):
 		nonlocal idx
 		out = []
-		for file in files:
-			dom = BeautifulSoup(slurp(file), "lxml")
-			for tag in dom.find_all('wagontype'):
-				try:
+		try:
+			for file in files:
+				dom = BeautifulSoup(slurp(file), "lxml")
+				for tag in dom.find_all('wagontype'):
 					out.append(Row.from_xml(tag.attrs, source=file, vanilla=vanilla, index=idx))
-				except ValueError as e:
-					e.add_note(repr(tag.attrs))
-					e.add_note(repr(file))
-					raise
-				#print(out[-1].asdict(False))
-				idx = idx + 1
+					#print(out[-1].asdict(False))
+					idx = idx + 1
+				for tag in dom.find_all('coord'):
+					#print(f"{repr(tag.attrs)}, source={file}")
+					nonlocal coords
+					coord = tcoords.from_xml(tag.attrs, source=file)
+					coords |= {coord.id: coord}
+		except ValueError as e:
+			e.add_note(repr(tag.attrs))
+			e.add_note(repr(file))
+			raise
 		return out
-	return impl(vfiles, True)+impl(files, False)
+	return impl(vfiles, True)+impl(files, False), coords
 
 def process_files(table, out, msg, fields, pred, exp, comp, exp_out):
 	def impl(outfile, table):
@@ -785,7 +825,8 @@ def process_files(table, out, msg, fields, pred, exp, comp, exp_out):
 			impl(outfile, table)
 
 def run(files, vfiles, train_out, wagon_out, vehicle_out, aircraft_out, univ_out, expected_trains, expected_wagons, unexpected_outstream):
-	table = read_files(files, vfiles)
+	table, coords = read_files(files, vfiles)
+	print(repr(coords))
 
 	process_files(table, train_out, "Trains:", train_row_labels,
 		Row.is_engine,
@@ -817,7 +858,9 @@ def make_arg_parser(gui):
 	parser.add_argument('-V', '--vanilla', action='append', default=[],
 		help="Path(s) to individual files for vanilla trains")
 	parser.add_argument('-P', '--vanilla_dir', action='append', default=[],
-		help="Path(s) to individual files for vanilla trains")
+		help="Path(s) to directories of files for vanilla trains")
+	parser.add_argument('-I', '--vanilla_media',
+		help="Path to vanilla media folder")
 	parser.add_argument('-T', '--expected_trains')
 	parser.add_argument('-W', '--expected_wagons')
 	parser.add_argument('-i', '--income')
@@ -843,6 +886,8 @@ def find_files(files, paths):
 		if not path.exists or not path.is_dir():
 			raise IOError('Invalid path ' + str(path))
 		for file in path.glob('*/config/wagon_types.xml'):
+			files.append(file)
+		for file in path.glob('*/config/tcoords.xml'):
 			files.append(file)
 	return files
 

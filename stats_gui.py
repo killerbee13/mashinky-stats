@@ -1,12 +1,15 @@
 # This Python file uses the following encoding: utf-8
+import functools
+from pathlib import Path
 import sys
 import time
-import functools
+
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QTableWidget,
 	QTableWidgetItem, QLabel)
 from PySide6.QtCore import Slot, Qt, QSize
 from PySide6.QtGui import QColor, QBrush, QFontMetrics, QPixmap
 from ui_mainwindow import Ui_MainWindow
+
 from mashinky_stats import (Row, handle_cli, read_files,
 	token_supply, adj_costs, labels_by_type, rnd)
 import constants as C
@@ -19,7 +22,7 @@ def rgb_from_hex(code):
 	return QColor.fromRgb(rgb[0], rgb[1], rgb[2])
 
 def translate_header(l):
-	return vars(Row).get(l).tbl if l in vars(Row) else l
+	return Row.__dict__.get(l).tbl if l in Row.__dict__ else l
 
 def fmt_cell(field, contents):
 	if field == 'index':
@@ -72,6 +75,8 @@ currencies = ['cash', 'coal', 'diesel', 'electric', 'adjcost',]
 map_curs = lambda pfx: [pfx + cur for cur in currencies]
 red = QColor.fromRgb(255, 224, 224)
 
+icon_map = {}
+
 class MainWindow(QMainWindow):
 	engine_labels = [
 		'name', 'max_speed', 'max_speed_mph', 'power', 'traction', 'towage', 'weight',
@@ -122,6 +127,27 @@ class MainWindow(QMainWindow):
 	def setupUi(self):
 		self.ui.setupUi(self)
 
+	def format_files_to_text(self, dirs: list[Path], files: list[Path]) -> tuple[str, str]:
+		vars = {Path('.'): Path.cwd()}
+		def shortest(roots: dict[Path, Path], path: Path) -> Path:
+			ret = path
+			for id,root in roots.items():
+				try:
+					rp = id/path.relative_to(root)
+					if len(str(rp)) < len(str(ret)):
+						ret = rp
+				except ValueError:
+					pass
+			return ret
+
+		if len(dirs) == 1:
+			root = dirs[0]
+			vars |= {Path('$m'): Path(root)}
+		else:
+			vars |= {Path(f'$m{i}'): Path(p) for i,p in enumerate(dirs)}
+		return (" ".join((f'{id}={p}' for id,p in vars.items() if id != Path('.'))),
+			" ".join((str(shortest(vars, p)) for p in files)))
+
 	@log_timer()
 	def __init__(self, argv):
 		super(MainWindow, self).__init__()
@@ -137,10 +163,17 @@ class MainWindow(QMainWindow):
 		self.ui.amt_diesel.setValue(token_supply[C.DIESEL])
 		self.ui.amt_electric.setValue(token_supply[C.ELECTRIC])
 
-		self.ui.lineEdit_others.setText(" ".join(self.args.files))
-		self.ui.lineEdit_moddir.setText(" ".join(self.args.path))
-		self.ui.lineEdit_vfiles.setText(" ".join(self.args.vanilla))
-		self.ui.lineEdit_vdir.setText(" ".join(self.args.vanilla_dir))
+		moddirs, modfiles = self.format_files_to_text(self.args.path, self.files)
+		self.ui.txt_moddir.setText(moddirs)
+		self.ui.txt_modfiles.setText(" ".join(self.args.files))
+		vdirs, vfiles = self.format_files_to_text(self.args.vanilla_dir, self.vfiles)
+		self.ui.txt_vdir.setText(vdirs)
+		self.ui.txt_vfiles.setText(" ".join(self.args.vanilla))
+		print(f"{len(self.files)}+{len(self.vfiles)}")
+
+		self.ui.txt_found_modfiles.setPlainText(modfiles)
+		self.ui.txt_found_vfiles.setPlainText(vfiles)
+
 		self.update_data()
 		self.cur_idxs = self.g_cur_idxs()
 		self.dirty = [False]*len(self.tables)
@@ -149,7 +182,10 @@ class MainWindow(QMainWindow):
 
 	@log_timer()
 	def update_data(self):
-		self.data = read_files(self.files, self.vfiles)
+		global icon_map
+		self.data,icon_map = read_files(self.files, self.vfiles)
+		#print(repr(icon_map))
+		print(len(icon_map), "textures")
 		filt = lambda f: [r.index for r in self.data if f(r)]
 
 		self.tables = [
@@ -172,7 +208,7 @@ class MainWindow(QMainWindow):
 			tbl.cellClicked.connect(self.tbl_click(tbl))
 			#self.reset_labels_for(tbl)
 		self.update_units()
-		#self.update_curs()
+		self.update_curs()
 		self.populated = True
 
 		sizes = [(tbl.columnCount(), tbl.rowCount()) for tbl, l, d in self.tables]

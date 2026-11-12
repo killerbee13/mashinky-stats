@@ -1,0 +1,8 @@
+[project]
+name = "mashinky-stats"
+
+[tool.pyside6-project]
+files = ["cmap.py", "cmaps.pc", "constants.py", "list_mod_names.sh", "mainwindow.ui", "mashinky_stats.py", "open.ui", "stats_gui.py", "table_props.py", "ui_mainwindow.py"]
+
+[tool.pyside6-uic]
+options = []
