@@ -1,13 +1,14 @@
 from pathlib import Path
 import argparse
 import csv
+from enum import Enum, auto
 import math
 import re
 import sys
 import warnings
 import types
 import typing
-from typing import Any, Generic, Optional, Type, TypeVar
+from typing import Any, Optional, Type, TypeVar
 from dataclasses import dataclass
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 import constants as C
@@ -29,38 +30,59 @@ _default.__call__ = lambda self, *args: Default
 otherwise = lambda a, b: a if a is not Default else b
 T = TypeVar('T')
 safe_div = lambda a, b: a/b if b else 0.
+class Disp(Enum):
+	Null = auto()
+	Positive = auto()
+	Negative = auto()
+
+@dataclass
 class FieldBase:
 	csv: Optional[str]
 	tbl: Optional[str]
-	owner: None
+	owner: Any = None
+	disp: Disp = Disp.Null
+	bin : Any = None
+	_key_name: str = None
+	def __set_name__(self, owner, name):
+		if not isinstance(owner, type):
+			object.__setattr__(self, 'owner', owner)
+		object.__setattr__(self, '_key_name', name)
 	def _key(self):
 		return f"key-{self._key_name}"
+	def __init__(self, U: Type, csv: Optional[str], tbl: Optional[str],
+		disp: Disp = Default, bin: Any = None):
+		object.__setattr__(self, 'csv', csv)
+		object.__setattr__(self, 'tbl', otherwise(tbl, csv))
+		if disp is Default:
+			if U is float or U is int or float in typing.get_args(U) or int in typing.get_args(U):
+				object.__setattr__(self, 'disp', Disp.Positive)
+		else:
+			object.__setattr__(self, 'disp', disp)
+		object.__setattr__(self, 'bin', bin)
+@dataclass
 class KeyBase(FieldBase):
-	xml: Optional[str]
-	_key_name: str
+	xml: Optional[str] = None
+	def __init__(self, U: Type, csv: Optional[str], tbl: Optional[str],
+		xml: Optional[str] = None, disp: Disp = Default, bin: Any = None):
+		super().__init__(U, csv, tbl, disp, bin)
+		object.__setattr__(self, 'xml', xml)
+		object.__setattr__(self,'_key_name', csv)
 
 def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
-	xml : Optional[str] = None, default: Optional[T] = Default):
+	xml : Optional[str] = None, default: Optional[T] = Default,
+	disp: Disp = Default, bin: Any = None):
 	"""def field(U: Type, csv: Optional[str], tbl: Optional[str] = csv, /,
-		xml : Optional[str] = None, default : Optional[T] = Default):
+		xml : Optional[str] = None, default : Optional[T] = Default
+		disp: Disp = Disp.Positive):
 	If only csv is specified, tbl reuses that value. If default is specified,
 	the field has that as its default value, otherwise there is no default."""
 	# name lookup gets confused by the class shadowing the closure-captured args
-	csv_ = csv
-	tbl_ = otherwise(tbl, csv_)
-	xml_ = xml
-
 	class Key(KeyBase):
 		owner = None
 		def __init__(self):
-			object.__setattr__(self,'csv', csv_)
-			object.__setattr__(self,'tbl', tbl_)
-			object.__setattr__(self,'xml', xml_)
-			object.__setattr__(self,'_key_name', csv_)
+			super().__init__(U, csv, tbl, xml, disp, bin)
 		def __set_name__(self, owner, name):
-			if not isinstance(owner, type):
-				object.__setattr__(self, 'owner', owner)
-			object.__setattr__(self, '_key_name', name)
+			super().__set_name__(owner, name)
 			if default is not Default:
 				if type(default) is U or type(default) in typing.get_args(U) or U is Any:
 					object.__setattr__(self, 'default', default)
@@ -121,39 +143,35 @@ def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
 				return self
 		Key.__get__ = __get__
 	return Key()
-def default_field(*args, xml=None):
-	return field(*args, xml=xml, default=None)
-def zero_field(*args, xml=None):
-	return field(*args, xml=xml, default=0)
+def default_field(*args, **kwargs):
+	return field(*args, default=None, **kwargs)
+def zero_field(*args, **kwargs):
+	return field(*args, default=0, **kwargs)
 def table_field(U: T, tbl: str, /, xml : Optional[str] = None,
-	default: Optional[T] = Default):
+	default: Optional[T] = Default, **kwargs):
 	"""For fields which are not in the CSV but are in the table"""
-	return field(U, None, tbl, xml=xml, default=default)
+	return field(U, None, tbl, xml=xml, default=default, **kwargs)
 def xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default,
-	default: Optional[T] = Default):
+	default: Optional[T] = Default, **kwargs):
 	"""Non-CSV fields"""
-	return field(U, None, tbl, xml=xml, default=default)
-def zero_xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default):
-	return field(U, None, tbl, xml=xml, default=0)
-def default_xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default):
-	return field(U, None, tbl, xml=xml, default=None)
+	return field(U, None, tbl, xml=xml, default=default, **kwargs)
+def zero_xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default, **kwargs):
+	return field(U, None, tbl, xml=xml, default=0, **kwargs)
+def default_xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default, **kwargs):
+	return field(U, None, tbl, xml=xml, default=None, **kwargs)
 
 def generated(first, *args, **kwargs):
 	"""Generates a field from others. Cannot have an xml key.
-	generated(fun: types.FunctionType, csv_: str, tbl_: Optional[str] = Default):
+	generated(fun: types.FunctionType, csv: Optional[str], tbl: Optional[str] = Default):
 		Value of obj.gen is computed as fun(obj). tbl defaults to csv
-	@generated(csv_: str, tbl_: Optional[str] = Default):
+	@generated(csv: str, tbl: Optional[str] = Default):
 		decorator version of the above"""
-	def impl(fun: types.FunctionType, csv_: Optional[str], tbl_: Optional[str] = Default, cache=True):
+	def impl(fun: types.FunctionType, csv: Optional[str],
+		tbl: Optional[str] = Default, result=None, cache=True, disp=Default, bin=None):
 		class Gen(FieldBase):
 			owner = None
 			def __init__(self):
-				object.__setattr__(self,'csv', csv_)
-				object.__setattr__(self,'tbl', otherwise(tbl_, csv_))
-			def __set_name__(self, owner, name):
-				if not isinstance(owner, type):
-					object.__setattr__(self, 'owner', owner)
-				object.__setattr__(self, '_key_name', name)
+				super().__init__(result, csv, tbl, disp, bin)
 			def is_default(self, *args):
 				return True
 			def __repr__(self):
@@ -193,7 +211,7 @@ def generated(first, *args, **kwargs):
 					return self
 			Gen.__get__ = __get__
 		return Gen()
-	if type(first) == str:
+	if type(first) is str or type(first) is None:
 		return lambda f: impl(f, first, *args, **kwargs)
 	elif callable(first):
 		return impl(first, *args, **kwargs)
@@ -370,18 +388,18 @@ class Row:
 	# XML/core properties: (in XML, shown in game, or very trivially derived)
 	#   Common:
 	name = field(str, C.NAME, xml='name')
-	index = table_field(int, 'Index')
+	index = table_field(int, 'Index', disp=Disp.Null)
 	source = field(Path, 'source', C.SOURCE, default='')
 	vanilla = table_field(bool, C.VANILLA, default=False)
 	id = field(str, 'id', 'ID', xml=C.ID, default='')
 	cid = default_field(Optional[str], C.CID, 'Cargo ID', xml='cargo')
-	vehicle_type = table_field(int, 'vehicle_type', xml='vehicle_type')
-	track = zero_field(int, None, C.TRACK, xml='track')
-	weight_full = field(float, C.WEIGHT_FULL, xml='weight_full')
-	weight_empty = field(float, C.WEIGHT_EMPTY, xml='weight_empty')
+	vehicle_type = table_field(int, 'vehicle_type', xml='vehicle_type', disp=Disp.Null)
+	track = zero_field(int, None, C.TRACK, xml='track', disp=Disp.Null)
+	weight_full = field(float, C.WEIGHT_FULL, xml='weight_full', disp=Disp.Negative)
+	weight_empty = field(float, C.WEIGHT_EMPTY, xml='weight_empty', disp=Disp.Negative)
 	epoch = field(str, C.EPOCHS, xml='epoch', default='')
 	eras = generated(lambda r: parse_eras(r.epoch), C.ERAS)
-	era = generated(lambda r: r.eras[0], C.ERA)
+	era = generated(lambda r: r.eras[0], C.ERA, result=int, disp=Disp.Null)
 
 	icon = xml_field(str, 'icon', default="")
 	icon_texture = xml_field(str, 'icon_texture', default="")
@@ -390,12 +408,12 @@ class Row:
 	length_b = zero_xml_field(float, 'length')
 	length_head = zero_xml_field(float, 'head_length')
 	length_tail = zero_xml_field(float, 'tail_length')
-	length = generated(lambda r: r.length_b + r.length_head + r.length_tail, C.LENGTH)
+	length = generated(lambda r: r.length_b + r.length_head + r.length_tail, C.LENGTH, result=float, disp=Disp.Negative)
 
 	#   Prime movers:
 	power = field(float, C.POWER, xml='power', default=0.)
 	max_speed = field(float, C.SPEED, xml='max_speed', default=0.)
-	max_speed_mph = generated(lambda r: r.max_speed/C.KM_PER_MI, C.SPEED_MPH)
+	max_speed_mph = generated(lambda r: r.max_speed/C.KM_PER_MI, C.SPEED_MPH, result=float)
 	max_speed_reverse = zero_field(Any, None, "Reverse speed (km/hr)", xml='max_speed_reverse')
 	@generated("Reverse speed (mph)")
 	def max_speed_reverse_mph(self):
@@ -403,21 +421,21 @@ class Row:
 			return round(self.max_speed_reverse/C.KM_PER_MI)
 		else:
 			return self.max_speed_reverse
-	weight = generated(lambda r: r.weight_full, C.WEIGHT)
-	@generated(C.TRACTION)
+	weight = generated(lambda r: r.weight_full, C.WEIGHT, result=float, disp=Disp.Negative)
+	@generated(C.TRACTION, result=float, disp=Disp.Positive)
 	def traction(self):
 		return math.floor(safe_div(self.power*C.TRACTION_SCALE, self.max_speed))
-	towage = generated(lambda r: r.traction - r.weight_full, C.TOWAGE)
-	throughput = generated(lambda r: r.towage*r.max_speed, C.THROUGHPUT)
+	towage = generated(lambda r: r.traction - r.weight_full, C.TOWAGE, result=float)
+	throughput = generated(lambda r: r.towage*r.max_speed, C.THROUGHPUT, result=float)
 
 	# Fuel
 	raw_cost = table_field(str, None, xml='fuel_cost', default='')
-	cost = generated(lambda r: costs(r.raw_cost), C.COSTS_RAW)
-	cash = generated(lambda r: r.cost.get(C.CASH, 0.), C.CASH)
-	coal = generated(lambda r: r.cost.get(C.COAL, 0.), C.COAL)
-	diesel = generated(lambda r: r.cost.get(C.DIESEL, 0.), C.DIESEL)
-	electric = generated(lambda r: r.cost.get(C.ELECTRIC, 0.), C.ELECTRIC)
-	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST, cache=False)
+	cost = generated(lambda r: costs(r.raw_cost), C.COSTS_RAW, result=float)
+	cash = generated(lambda r: r.cost.get(C.CASH, 0.), C.CASH, tbl="Money", result=float)
+	coal = generated(lambda r: r.cost.get(C.COAL, 0.), C.COAL, result=float)
+	diesel = generated(lambda r: r.cost.get(C.DIESEL, 0.), C.DIESEL, result=float)
+	electric = generated(lambda r: r.cost.get(C.ELECTRIC, 0.), C.ELECTRIC, result=float)
+	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST, tbl="Adjusted Cost", cache=False, result=float)
 
 	#   Cargo carriers:
 	capacity = zero_field(int, C.CARGO, xml='capacity')
@@ -439,7 +457,7 @@ class Row:
 			return float(effect.group(1))-1
 		else:
 			return 1
-	@generated(C.BONUS)
+	@generated(C.BONUS, result=float)
 	def bonus(self):
 		effect = re.fullmatch(r'(?:profit\[[^]]*\])\*([0-9]*.?[0-9]*)',
 			self.raw_effect)
@@ -450,66 +468,66 @@ class Row:
 
 	# Ratios and composites:
 	#   Prime movers:
-	pwt_full = generated(lambda r: safe_div(r.power, r.traction), C.PWT_FULL)
-	pwt_empty = generated(lambda r: r.power/r.weight_full, C.PWT_EMPTY)
-	tow_per_length = generated(lambda r: r.towage/r.length, C.TOW_PER_LENGTH)
-	power_per_length = generated(lambda r: r.power/r.length, C.POWER_PER_LENGTH)
+	pwt_full = generated(lambda r: safe_div(r.power, r.traction), C.PWT_FULL, result=float)
+	pwt_empty = generated(lambda r: r.power/r.weight_full, C.PWT_EMPTY, result=float)
+	tow_per_length = generated(lambda r: r.towage/r.length, C.TOW_PER_LENGTH, result=float)
+	power_per_length = generated(lambda r: r.power/r.length, C.POWER_PER_LENGTH, result=float)
 
 	#   Cargo carriers:
-	profit = generated(lambda r: r.capacity*r.effect, C.PROFITABILITY)
-	cargo_per_length = generated(lambda r: r.capacity/r.length, C.CARGO_PER_LENGTH)
-	profit_per_length = generated(lambda r: r.profit/r.length, C.PROFIT_PER_LENGTH)
-	cargo_per_wt = generated(lambda r: 10*r.capacity/r.weight_full, C.CARGO_PER_WT)
-	profit_per_wt = generated(lambda r: 10*r.profit/r.weight_full, C.PROFIT_PER_WT)
+	profit = generated(lambda r: r.capacity*r.effect, C.PROFITABILITY, result=float)
+	cargo_per_length = generated(lambda r: r.capacity/r.length, C.CARGO_PER_LENGTH, result=float)
+	profit_per_length = generated(lambda r: r.profit/r.length, C.PROFIT_PER_LENGTH, result=float)
+	cargo_per_wt = generated(lambda r: 10*r.capacity/r.weight_full, C.CARGO_PER_WT, result=float)
+	profit_per_wt = generated(lambda r: 10*r.profit/r.weight_full, C.PROFIT_PER_WT, result=float)
 
 	#   Units: (i.e. power and capacity both != 0)
-	cargo_throughput = generated(lambda r: r.capacity*r.max_speed, C.TP_CARGO)
-	profit_throughput = generated(lambda r: r.profit*r.max_speed, C.TP_PROFIT)
+	cargo_throughput = generated(lambda r: r.capacity*r.max_speed, C.TP_CARGO, result=float)
+	profit_throughput = generated(lambda r: r.profit*r.max_speed, C.TP_PROFIT, result=float)
 
 	#   Fuel:
-	def _TP(self, c: str, t: float) -> float:
+	def _TP1(self, c: str, t: float) -> float:
 		if self.power and self.cost.get(c):
 			return t/(self.cost.get(c, 0)*fixed_scale[c])
 		else:
 			return ''
-	def TP_ac(self, t: float) -> float:
+	def _TP_ac(self, t: float) -> float:
 		return self.adjcost and t/(self.adjcost*adj_scale)
-	def TP(self, cur: str) -> float:
-		return self._TP(cur, self.throughput)
-	def TPc(self, cur: str) -> float:
-		return self._TP(cur, self.cargo_throughput)
-	def TPp(self, cur: str) -> float:
-		return self._TP(cur, self.profit_throughput)
+	def _TP(self, cur: str) -> float:
+		return self._TP1(cur, self.throughput)
+	def _TPc(self, cur: str) -> float:
+		return self._TP1(cur, self.cargo_throughput)
+	def _TPp(self, cur: str) -> float:
+		return self._TP1(cur, self.profit_throughput)
 
-	TP_adjcost = generated(lambda r: r.TP_ac(r.throughput), C.TP_ADJCOST, cache=False)
-	TP_cash = generated(lambda r: r.TP(C.CASH), C.TP_CASH)
-	TP_coal = generated(lambda r: r.TP(C.COAL), C.TP_COAL)
-	TP_diesel = generated(lambda r: r.TP(C.DIESEL), C.TP_DIESEL)
-	TP_electric = generated(lambda r: r.TP(C.ELECTRIC), C.TP_ELECTRIC)
+	TP_adjcost = generated(lambda r: r._TP_ac(r.throughput), C.TP_ADJCOST, cache=False, result=float)
+	TP_cash = generated(lambda r: r._TP(C.CASH), C.TP_CASH, tbl="TP/Money", result=float)
+	TP_coal = generated(lambda r: r._TP(C.COAL), C.TP_COAL, result=float)
+	TP_diesel = generated(lambda r: r._TP(C.DIESEL), C.TP_DIESEL, result=float)
+	TP_electric = generated(lambda r: r._TP(C.ELECTRIC), C.TP_ELECTRIC, result=float)
 
-	TPc_adjcost = generated(lambda r: r.TP_ac(r.cargo_throughput), C.TPC_ADJCOST, cache=False)
-	TPp_adjcost = generated(lambda r: r.TP_ac(r.profit_throughput), C.TPP_ADJCOST, cache=False)
-	TPc_cash = generated(lambda r: r.TPc(C.CASH), C.TPC_CASH)
-	TPp_cash = generated(lambda r: r.TPp(C.CASH), C.TPP_CASH)
-	TPc_coal = generated(lambda r: r.TPc(C.COAL), C.TPC_COAL)
-	TPp_coal = generated(lambda r: r.TPp(C.COAL), C.TPP_COAL)
-	TPc_diesel = generated(lambda r: r.TPc(C.DIESEL), C.TPC_DIESEL)
-	TPp_diesel = generated(lambda r: r.TPp(C.DIESEL), C.TPP_DIESEL)
-	TPc_electric = generated(lambda r: r.TPc(C.ELECTRIC), C.TPC_ELECTRIC)
-	TPp_electric = generated(lambda r: r.TPp(C.ELECTRIC), C.TPP_ELECTRIC)
+	TPc_adjcost = generated(lambda r: r._TP_ac(r.cargo_throughput), C.TPC_ADJCOST, cache=False, result=float)
+	TPp_adjcost = generated(lambda r: r._TP_ac(r.profit_throughput), C.TPP_ADJCOST, cache=False, result=float)
+	TPc_cash = generated(lambda r: r._TPc(C.CASH), C.TPC_CASH, tbl="TPc/Money", result=float)
+	TPp_cash = generated(lambda r: r._TPp(C.CASH), C.TPP_CASH, tbl="TPp/Money", result=float)
+	TPc_coal = generated(lambda r: r._TPc(C.COAL), C.TPC_COAL, result=float)
+	TPp_coal = generated(lambda r: r._TPp(C.COAL), C.TPP_COAL, result=float)
+	TPc_diesel = generated(lambda r: r._TPc(C.DIESEL), C.TPC_DIESEL, result=float)
+	TPp_diesel = generated(lambda r: r._TPp(C.DIESEL), C.TPP_DIESEL, result=float)
+	TPc_electric = generated(lambda r: r._TPc(C.ELECTRIC), C.TPC_ELECTRIC, result=float)
+	TPp_electric = generated(lambda r: r._TPp(C.ELECTRIC), C.TPP_ELECTRIC, result=float)
 
 	#   train-specific
-	CD6 = generated(lambda r: r.towage/(6-r.length), C.CD6)
-	CD8 = generated(lambda r: r.towage/(8-r.length), C.CD8)
+	CD6 = generated(lambda r: r.towage/(6-r.length), C.CD6, result=float)
+	CD8 = generated(lambda r: r.towage/(8-r.length), C.CD8, result=float)
 
 	#   wagon-specific
 	def _compound(self, v: float) -> float:
 		return (v/self.length)*(10*v/self.weight_full)
-	compound_efficiency = generated(lambda r: r._compound(r.capacity), C.COMPOUND_EFFICIENCY)
-	compound_profitability = generated(lambda r: r._compound(r.profit), C.COMPOUND_PROFITABILITY)
-	density = generated(lambda r: r.weight_full/r.length, C.DENSITY)
-	wt_per_cargo = generated(lambda r: safe_div(r.weight_full, r.capacity), C.WT_PER_CARGO)
-	@generated(C.CARGO_UNIT_WT)
+	compound_efficiency = generated(lambda r: r._compound(r.capacity), C.COMPOUND_EFFICIENCY, result=float)
+	compound_profitability = generated(lambda r: r._compound(r.profit), C.COMPOUND_PROFITABILITY, result=float)
+	density = generated(lambda r: r.weight_full/r.length, C.DENSITY, result=float, disp=Disp.Negative)
+	wt_per_cargo = generated(lambda r: safe_div(r.weight_full, r.capacity), C.WT_PER_CARGO, result=float, disp=Disp.Negative)
+	@generated(C.CARGO_UNIT_WT, result=float, disp=Disp.Negative)
 	def cargo_unit_wt(self):
 		return safe_div(self.weight_full-self.weight_empty, self.capacity)
 
@@ -562,12 +580,13 @@ cargo_by_label = {
 }
 
 
-def rnd(x: T, recip_tol=100) -> T:
+def rnd(x: T, recip_tol=0) -> T:
 	try:
-		if type(x) is not bool and int(x) == x:
+		if type(x) is not bool and recip_tol == 0 and int(x) == x:
 			return int(x)
 	except:
 		pass
+	recip_tol = recip_tol or 100
 	return math.floor(x*recip_tol)/recip_tol if type(x) is float else x
 
 def costs(raw: str) -> dict[str, float]:
@@ -826,7 +845,7 @@ def process_files(table, out, msg, fields, pred, exp, comp, exp_out):
 
 def run(files, vfiles, train_out, wagon_out, vehicle_out, aircraft_out, univ_out, expected_trains, expected_wagons, unexpected_outstream):
 	table, coords = read_files(files, vfiles)
-	print(repr(coords))
+	#print(repr(coords))
 
 	process_files(table, train_out, "Trains:", train_row_labels,
 		Row.is_engine,
@@ -866,6 +885,7 @@ def make_arg_parser(gui):
 	parser.add_argument('-i', '--income')
 	if gui:
 		parser.add_argument('-c', '--cmap', action='append', default=[])
+		parser.add_argument('-style')
 	else:
 		parser.add_argument('-t', '--train_out', default='-')
 		parser.add_argument('-w', '--wagon_out', default='-')

@@ -4,22 +4,18 @@ from pathlib import Path
 import sys
 import time
 
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QTableWidget,
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
 	QTableWidgetItem, QLabel)
 from PySide6.QtCore import Slot, Qt, QSize
-from PySide6.QtGui import QColor, QBrush, QFontMetrics, QPixmap
+from PySide6.QtGui import QColor, QBrush, QPixmap, QImage
 from ui_mainwindow import Ui_MainWindow
 
 from mashinky_stats import (Row, handle_cli, read_files,
-	token_supply, adj_costs, labels_by_type, rnd)
+	token_supply, adj_costs, rnd)
 import constants as C
+import cmap
 
 pls_help_bug = []
-
-def rgb_from_hex(code):
-	code_hex = code.replace("#", "")
-	rgb = tuple(int(code_hex[i:i+2], 16) for i in (0, 2, 4))
-	return QColor.fromRgb(rgb[0], rgb[1], rgb[2])
 
 def translate_header(l):
 	return Row.__dict__.get(l).tbl if l in Row.__dict__ else l
@@ -30,7 +26,7 @@ def fmt_cell(field, contents):
 	else:
 		return str(rnd(contents))
 
-def log_timer(oself=None, print_args=True):
+def log_timer(oself=None, print_args=True, quiet=False):
 	#print(f"log_timer({oself})")
 	def decorator(func):
 		#print(f"log_timer({oself})({func}) {type(func)}")
@@ -49,6 +45,8 @@ def log_timer(oself=None, print_args=True):
 			delta_ms = (end-start)/1000000
 			#print(select_widget(args))
 			select_widget(args).setText(f"{func.__name__}: {delta_ms}ms")
+			if quiet:
+				return ret
 			if print_args:
 				def s(x):
 					if type(x) is Row:
@@ -102,17 +100,28 @@ class MainWindow(QMainWindow):
 	]
 	aircraft_labels = vehicle_labels.copy()
 	all_labels = Row().keys()
-	disp = {"unit": 0, "cmap": 0}
+	disp = {"unit": 0, "cmap": "None", "cmap_inv": False}
 	speed_units = (['max_speed', 'max_speed_reverse'], ['max_speed_mph', 'max_speed_reverse_mph'])
 	data = []
 	tables = []
 	ui = Ui_MainWindow()
 	populated = False
 	timer_widget = None
+	cmaps = {}
+	active_map = None
+	cmap_img = None
 
 	@log_timer()
 	def handle_cli(self):
 		self.args, self.files, self.vfiles = handle_cli(True)
+
+	@log_timer()
+	def load_cmaps(self):
+		for cm in self.args.cmap:
+			self.cmaps |= cmap.from_file(cm)
+		sel = self.ui.sel_cmap
+		sel.insertItems(1, self.cmaps.keys())
+		self.update_cmap()
 
 	def g_cur_idxs(self):
 		def scan(labels):
@@ -155,6 +164,7 @@ class MainWindow(QMainWindow):
 
 		self.handle_cli()
 		self.setupUi()
+		self.load_cmaps()
 
 		self.statusBar().addPermanentWidget(self.timer_widget)
 
@@ -169,15 +179,15 @@ class MainWindow(QMainWindow):
 		vdirs, vfiles = self.format_files_to_text(self.args.vanilla_dir, self.vfiles)
 		self.ui.txt_vdir.setText(vdirs)
 		self.ui.txt_vfiles.setText(" ".join(self.args.vanilla))
-		print(f"{len(self.files)}+{len(self.vfiles)}")
+		print(f"loaded {len(self.files)}+{len(self.vfiles)} files")
 
 		self.ui.txt_found_modfiles.setPlainText(modfiles)
 		self.ui.txt_found_vfiles.setPlainText(vfiles)
 
 		self.update_data()
 		self.cur_idxs = self.g_cur_idxs()
-		self.dirty = [False]*len(self.tables)
 		self.populate()
+		self.dirty = [False]*len(self.tables)
 		#print(self.all_labels)
 
 	@log_timer()
@@ -185,7 +195,7 @@ class MainWindow(QMainWindow):
 		global icon_map
 		self.data,icon_map = read_files(self.files, self.vfiles)
 		#print(repr(icon_map))
-		print(len(icon_map), "textures")
+		print(len(icon_map), "tcoords")
 		filt = lambda f: [r.index for r in self.data if f(r)]
 
 		self.tables = [
@@ -193,8 +203,8 @@ class MainWindow(QMainWindow):
 			(self.ui.tbl_wagons, self.wagon_labels, filt(Row.is_wagon)),
 			(self.ui.tbl_vehicles, self.vehicle_labels, filt(Row.is_vehicle)),
 			(self.ui.tbl_aircraft, self.aircraft_labels, filt(Row.is_aircraft)),
-			(self.ui.tbl_all, self.all_labels, list(range(min(len(self.data), 250)))),
-			#(self.ui.tbl_all, self.all_labels, self.data),
+			#(self.ui.tbl_all, self.all_labels, list(range(min(len(self.data), 250)))),
+			(self.ui.tbl_all, self.all_labels, list(range(len(self.data)))),
 		]
 
 	@log_timer()
@@ -259,7 +269,7 @@ class MainWindow(QMainWindow):
 		adj = adj_costs({cur: 1 for cur in C.CURRENCIES})
 		for cur in range(4):
 			self.ui.__getattribute__(f"lbl_adj_{currencies[cur]}").setText(
-				str(rnd(adj[cur])))
+				str(rnd(adj[cur],100)))
 		self.dirty = [True]*len(self.tables)
 
 	@Slot()
@@ -350,6 +360,57 @@ class MainWindow(QMainWindow):
 						tbl.item(r, c).setBackground(QBrush())
 		return impl
 
+	def update_cmap(self):
+		if self.disp["cmap"] == "None":
+			self.ui.sel_cmap_inv.setEnabled(False)
+			self.active_cmap = None
+		else:
+			self.ui.sel_cmap_inv.setEnabled(True)
+			if self.disp["cmap_inv"]:
+				#print("inverted")
+				self.active_cmap = reversed(self.cmaps[self.disp["cmap"]])
+			else:
+				self.active_cmap = self.cmaps[self.disp["cmap"]]
+		#print(self.disp)
+		#print(self.active_cmap)
+		self.update_vis_cmap()
+
+		# iterate tables?
+		# or maybe update a stylesheet
+
+	#@log_timer(quiet=True)
+	def update_vis_cmap(self):
+		label = self.ui.vis_cmap
+		rect = label.frameRect()
+		borders = 2*label.frameWidth() + 2*label.margin()
+		width = (rect.width() - borders)
+		#print(f"resize: {rect};{width}")
+		if self.active_cmap is None:
+			label.clear()
+			return
+		#
+		#if not self.cmap_img:
+		self.cmap_img = QImage(width, 1, QImage.Format.Format_RGB32)
+		self.cmap_img.fill(QColor.fromRgbF(0xee,0xfe,0xef))
+#		elif type(self.cmap_img) is QPixmap:
+#			self.cmap_img = self.cmap_img.copy(0, 0, width, 1)
+#			self.cmap_img.fill(QColor.fromRgbF(0xee,0xfe,0xef))
+		line = self.cmap_img.scanLine(0)
+		for i in range(width):
+			c = self.active_cmap.interpolate(i/(width-1))
+			line[(i*4):(i*4)+3] = bytearray((c.blue(), c.green(), c.red()))
+			#self.cmap_img.setPixelColor(i,0,c)
+		self.cmap_pix = QPixmap.fromImage(self.cmap_img)
+		label.setPixmap(self.cmap_pix)
+		label.setMinimumSize(1,label.height())
+
+	def resizeEvent(self, event):
+		#print(f"resizeEvent: {event.oldSize()}->{event.size()}")
+		if event.size().width() != event.oldSize().width() and self.active_cmap:
+			self.update_vis_cmap()
+
+
+
 	@Slot()
 	def open(self):
 		print("open")
@@ -384,12 +445,18 @@ class MainWindow(QMainWindow):
 			return
 		self.disp["unit"] = val
 		self.update_units()
-	@Slot(int)
+	@Slot(str)
 	def set_disp_cmap(self, val):
 		if not self.populated:
 			return
 		self.disp["cmap"] = val
-		self.update_units()
+		self.update_cmap()
+	@Slot(int)
+	def set_disp_cmap_inv(self, val):
+		if not self.populated:
+			return
+		self.disp["cmap_inv"] = bool(val)
+		self.update_cmap()
 
 class Table:
 	pass
@@ -407,6 +474,8 @@ if __name__ == "__main__":
 
 # Todo:
 # Add cmaps and highlighting
-# I haven't quite decided if I'm going to do a custom model/view thing or use a QSqlTableModel with an in-memory sqlite3 db
+# I haven't quite decided if I'm going to do a custom model/view thing or use a
+#	QSqlTableModel with an in-memory sqlite3 db
 # Add search
 # Add column hiding
+# Probably replace my custom field with dataclasses.field and use its metadata

@@ -1,3 +1,3 @@
 {
-    "files": ["table_props.py","open.ui","mainwindow.ui","list_mod_names.sh","cmaps.pc","stats_gui.py","constants.py","mashinky_stats.py","cmap.py","ui_mainwindow.py","pyproject.toml"]
+    "files": ["table_props.py","open.ui","mainwindow.ui","list_mod_names.sh","cmaps.pc","stats_gui.py","pyproject.toml","constants.py","mashinky_stats.py","cmap.py","ui_mainwindow.py"]
 }
