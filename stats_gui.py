@@ -5,8 +5,8 @@ import sys
 import time
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
-	QTableWidgetItem, QLabel)
-from PySide6.QtCore import Slot, Qt, QSize
+	QTableWidgetItem, QHeaderView, QLabel)
+from PySide6.QtCore import Slot, Qt, QPoint, QSize
 from PySide6.QtGui import QColor, QBrush, QPixmap, QImage
 from ui_mainwindow import Ui_MainWindow
 
@@ -108,20 +108,12 @@ class MainWindow(QMainWindow):
 	populated = False
 	timer_widget = None
 	cmaps = {}
-	active_map = None
+	active_cmap = None
 	cmap_img = None
 
 	@log_timer()
 	def handle_cli(self):
 		self.args, self.files, self.vfiles = handle_cli(True)
-
-	@log_timer()
-	def load_cmaps(self):
-		for cm in self.args.cmap:
-			self.cmaps |= cmap.from_file(cm)
-		sel = self.ui.sel_cmap
-		sel.insertItems(1, self.cmaps.keys())
-		self.update_cmap()
 
 	def g_cur_idxs(self):
 		def scan(labels):
@@ -135,6 +127,7 @@ class MainWindow(QMainWindow):
 	@log_timer()
 	def setupUi(self):
 		self.ui.setupUi(self)
+
 
 	def format_files_to_text(self, dirs: list[Path], files: list[Path]) -> tuple[str, str]:
 		vars = {Path('.'): Path.cwd()}
@@ -214,6 +207,8 @@ class MainWindow(QMainWindow):
 			h = tbl.horizontalHeader()
 			h.setSectionsMovable(True)
 			h.setSortIndicatorClearable(True)
+			h.setResizeContentsPrecision(8)
+			h.resizeSections(QHeaderView.ResizeMode.ResizeToContents)
 			tbl.setSortingEnabled(True)
 			tbl.cellClicked.connect(self.tbl_click(tbl))
 			#self.reset_labels_for(tbl)
@@ -235,6 +230,7 @@ class MainWindow(QMainWindow):
 		tbl.setRowCount(len(d))
 		tbl.setVerticalHeaderLabels([
 			self.data[row].name for row in d])
+		vh = tbl.verticalHeader()
 		for r, i in enumerate(d):
 			for c, f in enumerate(labels):
 				d = self.data[i][f]
@@ -244,6 +240,10 @@ class MainWindow(QMainWindow):
 					item.setToolTip(txt)
 				tbl.setItem(r, c, item)
 				pls_help_bug.append(None)
+				vh.resizeSection(r, 22)
+				pls_help_bug.append(None)
+		#vh.setResizeContentsPrecision(1)
+		#vh.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 		h = tbl.horizontalHeader()
 		h.sortIndicatorChanged.connect(self.reset_labels(tbl))
 		tbl.hideColumn(0)
@@ -321,8 +321,8 @@ class MainWindow(QMainWindow):
 	def reset_labels(self, tbl):
 		@Slot(int, Qt.SortOrder)
 		def reset_labels_impl(v, o):
-			if self.populated:
-				print(f"reset({v}, {o})")
+			#if self.populated:
+				#print(f"reset({v}, {o})")
 			if v == -1:
 				tbl.sortItems(0, Qt.SortOrder.AscendingOrder)
 			tbl.sortItems(tbl.horizontalHeader().sortIndicatorSection(), o)
@@ -360,17 +360,51 @@ class MainWindow(QMainWindow):
 						tbl.item(r, c).setBackground(QBrush())
 		return impl
 
+	@Slot(QPoint)
+	def tbl_context_menu(self, point):
+		print(f"context menu for {point}")
+
+	@Slot()
+	@log_timer()
+	def load_cmaps(self):
+		self.populated = False
+		self.cmaps = {}
+		selected = self.disp["cmap"]
+		for cm in self.args.cmap:
+			self.cmaps |= cmap.from_file(cm)
+		sel = self.ui.sel_cmap
+		sel.clear()
+		sel.addItem("None")
+		sel.addItems(self.cmaps.keys())
+		#print(f"current cmap {selected}")
+		self.populated = True
+		sel.setCurrentText(selected)
+		self.update_cmap()
+
+	@log_timer()
 	def update_cmap(self):
+		if not self.populated:
+			return
 		if self.disp["cmap"] == "None":
+			#print("no cmap")
 			self.ui.sel_cmap_inv.setEnabled(False)
 			self.active_cmap = None
 		else:
-			self.ui.sel_cmap_inv.setEnabled(True)
-			if self.disp["cmap_inv"]:
-				#print("inverted")
-				self.active_cmap = reversed(self.cmaps[self.disp["cmap"]])
-			else:
-				self.active_cmap = self.cmaps[self.disp["cmap"]]
+			#print(f"current cmap {self.disp['cmap']}")
+			try:
+				self.ui.sel_cmap_inv.setEnabled(True)
+				if self.disp["cmap_inv"]:
+					#print("inverted")
+					self.active_cmap = reversed(self.cmaps[self.disp["cmap"]])
+				else:
+					self.active_cmap = self.cmaps[self.disp["cmap"]]
+			except KeyError:
+				print(f"Resetting cmap because {self.disp['cmap']} doesn't exist")
+				self.ui.sel_cmap.setCurrentText("None")
+				# the docs say the signal is supposed to be emitted automatically
+				# but it doesn't seem to be
+				return self.set_disp_cmap("None")
+
 		#print(self.disp)
 		#print(self.active_cmap)
 		self.update_vis_cmap()
@@ -378,13 +412,13 @@ class MainWindow(QMainWindow):
 		# iterate tables?
 		# or maybe update a stylesheet
 
-	#@log_timer(quiet=True)
+	#@log_timer()
 	def update_vis_cmap(self):
 		label = self.ui.vis_cmap
-		rect = label.frameRect()
+		rect = label.size()
 		borders = 2*label.frameWidth() + 2*label.margin()
 		width = (rect.width() - borders)
-		#print(f"resize: {rect};{width}")
+		print(f"resize: {rect};{width}")
 		if self.active_cmap is None:
 			label.clear()
 			return
@@ -447,6 +481,7 @@ class MainWindow(QMainWindow):
 		self.update_units()
 	@Slot(str)
 	def set_disp_cmap(self, val):
+		#print(f"set_disp_cmap(self, {repr(val)}")
 		if not self.populated:
 			return
 		self.disp["cmap"] = val
@@ -457,10 +492,6 @@ class MainWindow(QMainWindow):
 			return
 		self.disp["cmap_inv"] = bool(val)
 		self.update_cmap()
-
-class Table:
-	pass
-# QSQLITE_ENABLE_REGEXP
 
 
 if __name__ == "__main__":
