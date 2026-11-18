@@ -513,6 +513,9 @@
                     <property name="text">
                      <string>Colormap</string>
                     </property>
+                    <property name="buddy">
+                     <cstring>sel_cmap</cstring>
+                    </property>
                    </widget>
                   </item>
                   <item row="0" column="0">
@@ -525,6 +528,9 @@
                     </property>
                     <property name="text">
                      <string>Speed unit</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>sel_unit</cstring>
                     </property>
                    </widget>
                   </item>
@@ -612,6 +618,9 @@
                     <property name="text">
                      <string>1.0</string>
                     </property>
+                    <property name="buddy">
+                     <cstring>amt_cash</cstring>
+                    </property>
                    </widget>
                   </item>
                   <item row="2" column="2">
@@ -630,6 +639,9 @@
                     </property>
                     <property name="text">
                      <string>10.00</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>amt_diesel</cstring>
                     </property>
                    </widget>
                   </item>
@@ -700,6 +712,9 @@
                     <property name="text">
                      <string>Diesel</string>
                     </property>
+                    <property name="buddy">
+                     <cstring>amt_diesel</cstring>
+                    </property>
                    </widget>
                   </item>
                   <item row="1" column="0">
@@ -713,6 +728,9 @@
                     <property name="text">
                      <string>Coal</string>
                     </property>
+                    <property name="buddy">
+                     <cstring>amt_coal</cstring>
+                    </property>
                    </widget>
                   </item>
                   <item row="0" column="0">
@@ -725,6 +743,9 @@
                     </property>
                     <property name="text">
                      <string>Money</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>amt_cash</cstring>
                     </property>
                    </widget>
                   </item>
@@ -764,6 +785,9 @@
                     <property name="text">
                      <string>10.00</string>
                     </property>
+                    <property name="buddy">
+                     <cstring>amt_coal</cstring>
+                    </property>
                    </widget>
                   </item>
                   <item row="3" column="2">
@@ -782,6 +806,9 @@
                     </property>
                     <property name="text">
                      <string>10.00</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>amt_electric</cstring>
                     </property>
                    </widget>
                   </item>
@@ -870,6 +897,9 @@
                     <property name="text">
                      <string>Electricity</string>
                     </property>
+                    <property name="buddy">
+                     <cstring>amt_electric</cstring>
+                    </property>
                    </widget>
                   </item>
                  </layout>
@@ -898,6 +928,9 @@
                  <property name="text">
                   <string>Vanilla files</string>
                  </property>
+                 <property name="buddy">
+                  <cstring>txt_vfiles</cstring>
+                 </property>
                 </widget>
                </item>
                <item row="1" column="1">
@@ -911,6 +944,9 @@
                 <widget class="QLabel" name="lbl_moddir">
                  <property name="text">
                   <string>Mod dirs</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>txt_moddir</cstring>
                  </property>
                 </widget>
                </item>
@@ -926,12 +962,18 @@
                  <property name="text">
                   <string>Mod files</string>
                  </property>
+                 <property name="buddy">
+                  <cstring>txt_modfiles</cstring>
+                 </property>
                 </widget>
                </item>
                <item row="0" column="0">
                 <widget class="QLabel" name="lbl_vdir">
                  <property name="text">
                   <string>Vanilla dirs</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>txt_vdir</cstring>
                  </property>
                 </widget>
                </item>
@@ -1044,6 +1086,9 @@
          </property>
          <property name="text">
           <string>Search</string>
+         </property>
+         <property name="buddy">
+          <cstring>lineEdit_search</cstring>
          </property>
         </widget>
        </item>
@@ -1168,6 +1213,30 @@
    </property>
   </action>
  </widget>
+ <tabstops>
+  <tabstop>tabWidget</tabstop>
+  <tabstop>scrollArea</tabstop>
+  <tabstop>sel_unit</tabstop>
+  <tabstop>sel_cmap</tabstop>
+  <tabstop>sel_cmap_inv</tabstop>
+  <tabstop>btn_reload_cmaps</tabstop>
+  <tabstop>amt_cash</tabstop>
+  <tabstop>amt_coal</tabstop>
+  <tabstop>amt_diesel</tabstop>
+  <tabstop>amt_electric</tabstop>
+  <tabstop>txt_vdir</tabstop>
+  <tabstop>txt_vfiles</tabstop>
+  <tabstop>txt_found_vfiles</tabstop>
+  <tabstop>txt_moddir</tabstop>
+  <tabstop>txt_modfiles</tabstop>
+  <tabstop>txt_found_modfiles</tabstop>
+  <tabstop>lineEdit_search</tabstop>
+  <tabstop>tbl_engines</tabstop>
+  <tabstop>tbl_all</tabstop>
+  <tabstop>tbl_aircraft</tabstop>
+  <tabstop>tbl_vehicles</tabstop>
+  <tabstop>tbl_wagons</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>
@@ -1225,8 +1294,8 @@
    <slot>set_coal(int)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>127</x>
-     <y>136</y>
+     <x>267</x>
+     <y>149</y>
     </hint>
     <hint type="destinationlabel">
      <x>591</x>
@@ -1241,8 +1310,8 @@
    <slot>set_disp_unit(int)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>63</x>
-     <y>240</y>
+     <x>142</x>
+     <y>93</y>
     </hint>
     <hint type="destinationlabel">
      <x>591</x>
@@ -1257,8 +1326,8 @@
    <slot>set_cash(int)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>61</x>
-     <y>136</y>
+     <x>267</x>
+     <y>117</y>
     </hint>
     <hint type="destinationlabel">
      <x>591</x>
@@ -1273,8 +1342,8 @@
    <slot>set_diesel(int)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>193</x>
-     <y>136</y>
+     <x>291</x>
+     <y>181</y>
     </hint>
     <hint type="destinationlabel">
      <x>591</x>
@@ -1289,8 +1358,8 @@
    <slot>set_disp_cmap(QString)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>77</x>
-     <y>296</y>
+     <x>148</x>
+     <y>149</y>
     </hint>
     <hint type="destinationlabel">
      <x>591</x>
@@ -1305,8 +1374,8 @@
    <slot>set_electric(int)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>259</x>
-     <y>136</y>
+     <x>327</x>
+     <y>213</y>
     </hint>
     <hint type="destinationlabel">
      <x>591</x>
