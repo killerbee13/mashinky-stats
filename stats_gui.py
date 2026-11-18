@@ -1,16 +1,19 @@
 # This Python file uses the following encoding: utf-8
+from collections import defaultdict
 import functools
 from pathlib import Path
 import sys
 import time
 
+#import numpy as np
+
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
-	QTableWidgetItem, QHeaderView, QLabel)
+	QTableWidgetItem, QHeaderView, QLabel, QFrame)
 from PySide6.QtCore import Slot, Qt, QPoint, QSize
 from PySide6.QtGui import QColor, QBrush, QPixmap, QImage
 from ui_mainwindow import Ui_MainWindow
 
-from mashinky_stats import (Row, handle_cli, read_files,
+from mashinky_stats import (Row, Disp, handle_cli, find_files, read_files,
 	token_supply, adj_costs, rnd)
 import constants as C
 import cmap
@@ -44,7 +47,7 @@ def log_timer(oself=None, print_args=True, quiet=False):
 			end = time.monotonic_ns()
 			delta_ms = (end-start)/1000000
 			#print(select_widget(args))
-			select_widget(args).setText(f"{func.__name__}: {delta_ms}ms")
+			select_widget(args).setText(f"{func.__name__}: {delta_ms}ms | {len(pls_help_bug)} bug prayers")
 			if quiet:
 				return ret
 			if print_args:
@@ -93,7 +96,7 @@ class MainWindow(QMainWindow):
 	vehicle_labels = [
 		'name', 'ctype', 'capacity', 'max_speed', 'max_speed_mph', 'power',
 		'weight_empty', 'weight_full', 'length', 'eras', 'bonus',
-		'pwt_full', 'pwt_empty', 'throughput', 'cargo_throughput',
+		'pwt_full', 'pwt_empty', 'cargo_throughput',
 		'cargo_per_length', 'profit', 'profit_per_length', 'cargo_unit_wt',
 		]+map_curs('TP_')+currencies+map_curs('TPc_')+map_curs('TPp_')+[
 		'era', 'id', 'cid', 'source', 'vanilla', 'index'
@@ -103,13 +106,14 @@ class MainWindow(QMainWindow):
 	disp = {"unit": 0, "cmap": "None", "cmap_inv": False}
 	speed_units = (['max_speed', 'max_speed_reverse'], ['max_speed_mph', 'max_speed_reverse_mph'])
 	data = []
-	tables = []
+	tables = (None,None,None,None,None)
 	ui = Ui_MainWindow()
 	populated = False
 	timer_widget = None
 	cmaps = {}
 	active_cmap = None
 	cmap_img = None
+	table_last_cmap = [None]*len(tables)
 
 	@log_timer()
 	def handle_cli(self):
@@ -153,18 +157,41 @@ class MainWindow(QMainWindow):
 	@log_timer()
 	def __init__(self, argv):
 		super(MainWindow, self).__init__()
-		self.timer_widget = QLabel()
+		self.cmap_widget = QLabel(self)
+		self.cmap_widget.setObjectName('cmap_widget')
+		self.timer_widget = QLabel(self)
+		self.timer_widget.setObjectName('timer_widget')
 
 		self.handle_cli()
 		self.setupUi()
 		self.load_cmaps()
 
 		self.statusBar().addPermanentWidget(self.timer_widget)
+		self.statusBar().addPermanentWidget(self.cmap_widget)
 
 		self.ui.amt_cash.setValue(token_supply[C.CASH])
 		self.ui.amt_coal.setValue(token_supply[C.COAL])
 		self.ui.amt_diesel.setValue(token_supply[C.DIESEL])
 		self.ui.amt_electric.setValue(token_supply[C.ELECTRIC])
+
+		def walkchildren(widget, parent):
+			for child in widget.children():
+				#name = (child.objectName() or hex(id(child)))
+				#print(f"{parent}.{name} {child}")
+				if isinstance(child, QFrame):
+					child.setFrameShape(QFrame.Shape.Panel)
+					child.setFrameShadow(QFrame.Shadow.Sunken)
+				#walkchildren(child, parent + '.' + name)
+		walkchildren(self.statusBar(), 'statusBar')
+
+		self.read_data(reload=False)
+
+	@Slot()
+	@log_timer()
+	def read_data(self, reload=True):
+		if reload:
+			self.files = find_files(self.args.files, self.args.path)
+			self.vfiles = find_files(self.args.vanilla, self.args.vanilla_dir)
 
 		moddirs, modfiles = self.format_files_to_text(self.args.path, self.files)
 		self.ui.txt_moddir.setText(moddirs)
@@ -172,15 +199,18 @@ class MainWindow(QMainWindow):
 		vdirs, vfiles = self.format_files_to_text(self.args.vanilla_dir, self.vfiles)
 		self.ui.txt_vdir.setText(vdirs)
 		self.ui.txt_vfiles.setText(" ".join(self.args.vanilla))
-		print(f"loaded {len(self.files)}+{len(self.vfiles)} files")
-
 		self.ui.txt_found_modfiles.setPlainText(modfiles)
 		self.ui.txt_found_vfiles.setPlainText(vfiles)
+		print(f"loaded {len(self.files)}+{len(self.vfiles)} files")
 
+		#self.populated = False
 		self.update_data()
-		self.cur_idxs = self.g_cur_idxs()
 		self.populate()
-		self.dirty = [False]*len(self.tables)
+		self.dirty = [True]*len(self.tables)
+		if reload:
+			currentTab = self.ui.tabWidget.currentIndex()
+			if currentTab < len(self.tables):
+				self.reset_labels_for(self.tables[currentTab][0])
 		#print(self.all_labels)
 
 	@log_timer()
@@ -191,18 +221,20 @@ class MainWindow(QMainWindow):
 		print(len(icon_map), "tcoords")
 		filt = lambda f: [r.index for r in self.data if f(r)]
 
-		self.tables = [
+		self.tables = (
 			(self.ui.tbl_engines, self.engine_labels, filt(Row.is_engine)),
 			(self.ui.tbl_wagons, self.wagon_labels, filt(Row.is_wagon)),
 			(self.ui.tbl_vehicles, self.vehicle_labels, filt(Row.is_vehicle)),
 			(self.ui.tbl_aircraft, self.aircraft_labels, filt(Row.is_aircraft)),
 			#(self.ui.tbl_all, self.all_labels, list(range(min(len(self.data), 250)))),
 			(self.ui.tbl_all, self.all_labels, list(range(len(self.data)))),
-		]
+		)
+		self.cur_idxs = self.g_cur_idxs()
 
 	@log_timer()
 	def populate(self):
 		for tbl, labels, d in self.tables:
+			#print(d)
 			self.populate_table(tbl, labels, d)
 			h = tbl.horizontalHeader()
 			h.setSectionsMovable(True)
@@ -224,6 +256,8 @@ class MainWindow(QMainWindow):
 
 	@log_timer()
 	def populate_table(self, tbl, labels, d):
+		tbl.clear()
+		tbl.setSortingEnabled(False)
 		tbl.setColumnCount(len(labels))
 		l2 = [translate_header(l) for l in labels]
 		tbl.setHorizontalHeaderLabels(l2)
@@ -231,13 +265,17 @@ class MainWindow(QMainWindow):
 		tbl.setVerticalHeaderLabels([
 			self.data[row].name for row in d])
 		vh = tbl.verticalHeader()
-		for r, i in enumerate(d):
-			for c, f in enumerate(labels):
-				d = self.data[i][f]
-				txt = fmt_cell(f, d)
+		for c, f in enumerate(labels):
+			#print(d)
+			params = self.params(d, f, tbl is not self.ui.tbl_engines)
+			for r, i in enumerate(d):
+				dat = self.data[i][f]
+				txt = fmt_cell(f, dat)
 				item = QTableWidgetItem(txt)
 				if len(txt) > 10:
 					item.setToolTip(txt)
+				bin = self.data[i].cid if tbl is not self.ui.tbl_engines else None
+				self.color(dat, item, params, bin, f)
 				tbl.setItem(r, c, item)
 				pls_help_bug.append(None)
 				vh.resizeSection(r, 22)
@@ -248,6 +286,82 @@ class MainWindow(QMainWindow):
 		h.sortIndicatorChanged.connect(self.reset_labels(tbl))
 		tbl.hideColumn(0)
 		tbl.sortItems(0, Qt.SortOrder.AscendingOrder)
+
+	@log_timer()
+	def update_colors(self, idx):
+		tbl, labels, d = self.tables[idx]
+		idx_c = -1
+		for c,l in enumerate(labels):
+			if l == 'index':
+				idx_c = c
+		for c, f in enumerate(labels):
+			params = self.params(d, f, idx != 0)
+			for r in range(tbl.rowCount()):
+				key = int(tbl.item(r,idx_c).text())
+				item = tbl.item(r,c)
+				dat = self.data[key][f]
+				self.color(dat, item, params, self.data[key].cid if idx != 0 else None, f)
+		self.table_last_cmap[idx] = self.active_cmap
+
+	def params(self, d, f, do_bin):
+		field = Row.__dict__[f]
+		if field.disp == Disp.Positive:
+			def minmax(l):
+				return min(l), max(l)
+		elif field.disp == Disp.Negative:
+			def minmax(l):
+				return max(l), min(l)
+		else:
+			return
+		#print(d)
+		if do_bin:
+			bins = defaultdict(list)
+			for row in d:
+				try:
+					v = float(self.data[row][f])
+					if f is not None:
+						bins[self.data[row].cid].append(v)
+				except TypeError:
+					pass
+				except KeyError:
+					pass
+				except ValueError:
+					pass
+			return {k: minmax(b) for k,b in bins.items()}
+		else:
+			l = []
+			for row in d:
+				try:
+					v = float(self.data[row][f])
+					if f is not None:
+						l.append(v)
+				except TypeError:
+					pass
+				except KeyError:
+					pass
+				except ValueError:
+					pass
+			return {None: minmax(l)}
+
+	def color(self, d, item, params, bin, f):
+		if params and self.active_cmap and d != '':
+			try:
+				t = cmap.inv_lerp(params[bin][0], params[bin][1], float(d))
+				c = self.active_cmap.interpolate(t)
+				c.setAlphaF(.8)
+				item.setBackground(c)
+				pls_help_bug.append(None)
+				return True
+			except ValueError:
+				print(f"color VE {f} {repr(d)} {repr(params)}[{repr(bin)}]={repr(params[bin])}")
+				return False
+			except KeyError:
+				print(f"color KE {f} {repr(d)} {repr(params)}[{repr(bin)}]")
+				#item.setBackground(QColor.fromRgbF(1,0,0,1))
+				return False
+		else:
+			return False
+
 
 	@Slot()
 	def update_units(self):
@@ -267,7 +381,7 @@ class MainWindow(QMainWindow):
 
 	def update_curs(self):
 		adj = adj_costs({cur: 1 for cur in C.CURRENCIES})
-		for cur in range(4):
+		for cur in range(len(currencies)-1):
 			self.ui.__getattribute__(f"lbl_adj_{currencies[cur]}").setText(
 				str(rnd(adj[cur],100)))
 		self.dirty = [True]*len(self.tables)
@@ -276,7 +390,7 @@ class MainWindow(QMainWindow):
 	@log_timer()
 	def update_views(self):
 		if not self.populated:
-			return
+			return False
 		self.update_curs()
 		counts = []
 		for idx in range(len(self.tables)):
@@ -289,17 +403,21 @@ class MainWindow(QMainWindow):
 			sort = tbl.isSortingEnabled()
 			tbl.setSortingEnabled(False)
 			count = 0
-			for r in range(tbl.rowCount()):
-				for c in self.cur_idxs[idx]:
+			for c in self.cur_idxs[idx]:
+				params = self.params(d, labels[c], idx != 0)
+				for r in range(tbl.rowCount()):
 					f = labels[c]
 					key = int(tbl.item(r,idx_c).text())
 					item = tbl.item(r,c)
-					new = fmt_cell(f, self.data[key][f])
+					dat = self.data[key][f]
+					new = fmt_cell(f, dat)
 					old = item.text()
 					if new != old:
 						#print(f"{tbl.objectName()}item({r},{c}) '{new}' != '{old}'")
 						item.setText(new)
+						# change to setFont to set underline or italic
 						item.setBackground(red)
+						self.color(dat, item, params, self.data[key].cid if idx != 0 else None, f)
 						count = count + 1
 					elif item.background() != QBrush():
 						item.setBackground(QBrush())
@@ -310,13 +428,16 @@ class MainWindow(QMainWindow):
 				self.reset_labels_for(tbl)
 		self.statusBar().showMessage("Updated " + ", ".join(
 			(str(c) for c in counts)) + " items")
+		return True
 
 	@Slot(int)
+	@log_timer()
 	def update_table(self, idx):
-		if idx >= len(self.tables) or not self.dirty[idx]:
-			return
-		self.update_views()
-		self.dirty[idx] = False
+		if idx < len(self.tables):
+			if self.dirty[idx]:
+				self.dirty[idx] = not self.update_views()
+			if self.table_last_cmap[idx] is not self.active_cmap:
+				self.update_colors(idx)
 
 	def reset_labels(self, tbl):
 		@Slot(int, Qt.SortOrder)
@@ -351,6 +472,7 @@ class MainWindow(QMainWindow):
 		@Slot(int, int)
 		def impl(cr, cc):
 			print(f"{tbl.objectName()}.tbl_click({cr},{cc})")
+			return
 			for r in range(tbl.rowCount()):
 				for c in range(tbl.columnCount()):
 					pls_help_bug.append(None)
@@ -408,9 +530,7 @@ class MainWindow(QMainWindow):
 		#print(self.disp)
 		#print(self.active_cmap)
 		self.update_vis_cmap()
-
-		# iterate tables?
-		# or maybe update a stylesheet
+		self.cmap_widget.setText(self.disp["cmap"] + (" (R)" if self.disp["cmap_inv"] else ""))
 
 	#@log_timer()
 	def update_vis_cmap(self):

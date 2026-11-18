@@ -1128,16 +1128,18 @@
    </property>
    <widget class="QMenu" name="menuFiles">
     <property name="title">
-     <string>File</string>
+     <string>&amp;File</string>
     </property>
     <addaction name="actionOpen"/>
     <addaction name="actionMods"/>
+    <addaction name="separator"/>
+    <addaction name="actionReload"/>
     <addaction name="separator"/>
     <addaction name="actionQuit"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
-     <string>Edit</string>
+     <string>&amp;Edit</string>
     </property>
     <addaction name="actionCopy"/>
     <addaction name="separator"/>
@@ -1146,7 +1148,11 @@
    <addaction name="menuFiles"/>
    <addaction name="menuEdit"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="sizeGripEnabled">
+    <bool>false</bool>
+   </property>
+  </widget>
   <action name="actionOpen">
    <property name="enabled">
     <bool>false</bool>
@@ -1212,9 +1218,22 @@
     <string>Ctrl+A</string>
    </property>
   </action>
+  <action name="actionReload">
+   <property name="text">
+    <string>Reload data</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
+   </property>
+  </action>
  </widget>
  <tabstops>
   <tabstop>tabWidget</tabstop>
+  <tabstop>tbl_engines</tabstop>
+  <tabstop>tbl_wagons</tabstop>
+  <tabstop>tbl_vehicles</tabstop>
+  <tabstop>tbl_aircraft</tabstop>
+  <tabstop>tbl_all</tabstop>
   <tabstop>scrollArea</tabstop>
   <tabstop>sel_unit</tabstop>
   <tabstop>sel_cmap</tabstop>
@@ -1231,11 +1250,6 @@
   <tabstop>txt_modfiles</tabstop>
   <tabstop>txt_found_modfiles</tabstop>
   <tabstop>lineEdit_search</tabstop>
-  <tabstop>tbl_engines</tabstop>
-  <tabstop>tbl_all</tabstop>
-  <tabstop>tbl_aircraft</tabstop>
-  <tabstop>tbl_vehicles</tabstop>
-  <tabstop>tbl_wagons</tabstop>
  </tabstops>
  <resources/>
  <connections>
@@ -1511,6 +1525,22 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>actionReload</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>read_data()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>584</x>
+     <y>419</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <slot>open()</slot>
@@ -1528,5 +1558,6 @@
   <slot>set_disp_cmap_inv(int)</slot>
   <slot>load_cmaps()</slot>
   <slot>tbl_context_menu(QPoint)</slot>
+  <slot>read_data()</slot>
  </slots>
 </ui>

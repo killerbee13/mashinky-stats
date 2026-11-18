@@ -31,12 +31,13 @@ otherwise = lambda a, b: a if a is not Default else b
 T = TypeVar('T')
 safe_div = lambda a, b: a/b if b else 0.
 class Disp(Enum):
-	Null = auto()
+	Null = 0
 	Positive = auto()
 	Negative = auto()
 
 @dataclass
 class FieldBase:
+	annotation: Type
 	csv: Optional[str]
 	tbl: Optional[str]
 	owner: Any = None
@@ -53,6 +54,7 @@ class FieldBase:
 		disp: Disp = Default, bin: Any = None):
 		object.__setattr__(self, 'csv', csv)
 		object.__setattr__(self, 'tbl', otherwise(tbl, csv))
+		object.__setattr__(self, 'annotation', U)
 		if disp is Default:
 			if U is float or U is int or float in typing.get_args(U) or int in typing.get_args(U):
 				object.__setattr__(self, 'disp', Disp.Positive)
@@ -430,12 +432,12 @@ class Row:
 
 	# Fuel
 	raw_cost = table_field(str, None, xml='fuel_cost', default='')
-	cost = generated(lambda r: costs(r.raw_cost), C.COSTS_RAW, result=float)
-	cash = generated(lambda r: r.cost.get(C.CASH, 0.), C.CASH, tbl="Money", result=float)
-	coal = generated(lambda r: r.cost.get(C.COAL, 0.), C.COAL, result=float)
-	diesel = generated(lambda r: r.cost.get(C.DIESEL, 0.), C.DIESEL, result=float)
-	electric = generated(lambda r: r.cost.get(C.ELECTRIC, 0.), C.ELECTRIC, result=float)
-	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST, tbl="Adjusted Cost", cache=False, result=float)
+	cost = generated(lambda r: costs(r.raw_cost), C.COSTS_RAW)
+	cash = generated(lambda r: r.cost.get(C.CASH, 0.), C.CASH, tbl="Money", result=float, disp=Disp.Negative)
+	coal = generated(lambda r: r.cost.get(C.COAL, 0.), C.COAL, result=float, disp=Disp.Negative)
+	diesel = generated(lambda r: r.cost.get(C.DIESEL, 0.), C.DIESEL, result=float, disp=Disp.Negative)
+	electric = generated(lambda r: r.cost.get(C.ELECTRIC, 0.), C.ELECTRIC, result=float, disp=Disp.Negative)
+	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST, tbl="Adjusted Cost", cache=False, result=float, disp=Disp.Negative)
 
 	#   Cargo carriers:
 	capacity = zero_field(int, C.CARGO, xml='capacity')
@@ -454,7 +456,7 @@ class Row:
 		effect = re.fullmatch(r'(?:profit\[[^]]*\])\*([0-9]*.?[0-9]*)',
 			self.raw_effect)
 		if effect:
-			return float(effect.group(1))-1
+			return float(effect.group(1))
 		else:
 			return 1
 	@generated(C.BONUS, result=float)
