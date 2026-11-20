@@ -4,19 +4,19 @@ import functools
 from pathlib import Path
 import sys
 import time
-import traceback
 
+#import traceback
 #import numpy as np
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
 	QTableWidgetItem, QHeaderView, QLabel, QFrame)
-from PySide6.QtCore import Slot, Qt, QPoint, QSize
+from PySide6.QtCore import Slot, Qt, QPoint
 from PySide6.QtGui import QColor, QBrush, QPixmap, QImage, QCursor
 from ui_mainwindow import Ui_MainWindow
 
-from mashinky_stats import (Row, Disp, handle_cli, find_files, read_files,
-	token_supply, adj_costs, rnd)
 import constants as C
+from mashinky_stats import handle_cli, find_files, read_files
+from TableModel import Disp, Row, token_supply, adj_costs, rnd
 import cmap
 
 pls_help_bug = []
