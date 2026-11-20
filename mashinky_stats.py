@@ -34,6 +34,7 @@ class Disp(Enum):
 	Null = 0
 	Positive = auto()
 	Negative = auto()
+	Parity = auto()
 
 @dataclass
 class FieldBase:
@@ -424,6 +425,8 @@ class Row:
 		else:
 			return self.max_speed_reverse
 	weight = generated(lambda r: r.weight_full, C.WEIGHT, result=float, disp=Disp.Negative)
+
+	#   Trains:
 	@generated(C.TRACTION, result=float, disp=Disp.Positive)
 	def traction(self):
 		return math.floor(safe_div(self.power*C.TRACTION_SCALE, self.max_speed))
@@ -470,10 +473,13 @@ class Row:
 
 	# Ratios and composites:
 	#   Prime movers:
-	pwt_full = generated(lambda r: safe_div(r.power, r.traction), C.PWT_FULL, result=float)
-	pwt_empty = generated(lambda r: r.power/r.weight_full, C.PWT_EMPTY, result=float)
-	tow_per_length = generated(lambda r: r.towage/r.length, C.TOW_PER_LENGTH, result=float)
+	pwt_empty = generated(lambda r: r.power/r.weight_empty, C.PWT_EMPTY, result=float)
+	pwt_full = generated(lambda r: safe_div(r.power, r.weight_full), C.PWT_FULL, result=float)
 	power_per_length = generated(lambda r: r.power/r.length, C.POWER_PER_LENGTH, result=float)
+
+	#   Trains:
+	pwt_loaded = generated(lambda r: safe_div(r.power, r.traction), C.PWT_FULL, result=float)
+	tow_per_length = generated(lambda r: r.towage/r.length, C.TOW_PER_LENGTH, result=float)
 
 	#   Cargo carriers:
 	profit = generated(lambda r: r.capacity*r.effect, C.PROFITABILITY, result=float)
@@ -501,12 +507,17 @@ class Row:
 	def _TPp(self, cur: str) -> float:
 		return self._TP1(cur, self.profit_throughput)
 
+	#   Train-specific
+	CD6 = generated(lambda r: r.towage/(6-r.length), C.CD6, result=float)
+	CD8 = generated(lambda r: r.towage/(8-r.length), C.CD8, result=float)
+
 	TP_adjcost = generated(lambda r: r._TP_ac(r.throughput), C.TP_ADJCOST, cache=False, result=float)
 	TP_cash = generated(lambda r: r._TP(C.CASH), C.TP_CASH, tbl="TP/Money", result=float)
 	TP_coal = generated(lambda r: r._TP(C.COAL), C.TP_COAL, result=float)
 	TP_diesel = generated(lambda r: r._TP(C.DIESEL), C.TP_DIESEL, result=float)
 	TP_electric = generated(lambda r: r._TP(C.ELECTRIC), C.TP_ELECTRIC, result=float)
 
+	#   Unit-specific
 	TPc_adjcost = generated(lambda r: r._TP_ac(r.cargo_throughput), C.TPC_ADJCOST, cache=False, result=float)
 	TPp_adjcost = generated(lambda r: r._TP_ac(r.profit_throughput), C.TPP_ADJCOST, cache=False, result=float)
 	TPc_cash = generated(lambda r: r._TPc(C.CASH), C.TPC_CASH, tbl="TPc/Money", result=float)
@@ -518,11 +529,7 @@ class Row:
 	TPc_electric = generated(lambda r: r._TPc(C.ELECTRIC), C.TPC_ELECTRIC, result=float)
 	TPp_electric = generated(lambda r: r._TPp(C.ELECTRIC), C.TPP_ELECTRIC, result=float)
 
-	#   train-specific
-	CD6 = generated(lambda r: r.towage/(6-r.length), C.CD6, result=float)
-	CD8 = generated(lambda r: r.towage/(8-r.length), C.CD8, result=float)
-
-	#   wagon-specific
+	#   Wagon-specific
 	def _compound(self, v: float) -> float:
 		return (v/self.length)*(10*v/self.weight_full)
 	compound_efficiency = generated(lambda r: r._compound(r.capacity), C.COMPOUND_EFFICIENCY, result=float)
@@ -886,7 +893,8 @@ def make_arg_parser(gui):
 	parser.add_argument('-W', '--expected_wagons')
 	parser.add_argument('-i', '--income')
 	if gui:
-		parser.add_argument('-c', '--cmap', action='append', default=[])
+		parser.add_argument('--cmap', action='append', default=[])
+		parser.add_argument('-c', '--color')
 		parser.add_argument('-style')
 	else:
 		parser.add_argument('-t', '--train_out', default='-')

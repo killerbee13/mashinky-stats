@@ -81,10 +81,10 @@ icon_map = {}
 class MainWindow(QMainWindow):
 	engine_labels = [
 		'name', 'max_speed', 'max_speed_mph', 'power', 'traction', 'towage', 'weight',
-		'length', 'eras', 'throughput', 'pwt_full', 'pwt_empty',
+		'length', 'eras', 'throughput', 'pwt_loaded', 'pwt_empty',
 		'tow_per_length', 'power_per_length',
 		]+map_curs('TP_')+currencies+[
-		'CD6', 'CD8', 'era', 'id', 'source', 'vanilla', 'index'
+		'track', 'CD6', 'CD8', 'era', 'id', 'source', 'vanilla', 'index'
 	]
 	wagon_labels = [
 		'name', 'ctype', 'capacity', 'weight_empty', 'weight_full', 'length', 'eras',
@@ -98,7 +98,7 @@ class MainWindow(QMainWindow):
 		'weight_empty', 'weight_full', 'length', 'eras', 'bonus',
 		'pwt_full', 'pwt_empty', 'cargo_throughput',
 		'cargo_per_length', 'profit', 'profit_per_length', 'cargo_unit_wt',
-		]+map_curs('TP_')+currencies+map_curs('TPc_')+map_curs('TPp_')+[
+		]+currencies+map_curs('TPc_')+map_curs('TPp_')+[
 		'era', 'id', 'cid', 'source', 'vanilla', 'index'
 	]
 	aircraft_labels = vehicle_labels.copy()
@@ -165,6 +165,9 @@ class MainWindow(QMainWindow):
 		self.handle_cli()
 		self.setupUi()
 		self.load_cmaps()
+		if self.args.color:
+			self.ui.sel_cmap.setCurrentText(self.args.color)
+			self.set_disp_cmap(self.args.color)
 
 		self.statusBar().addPermanentWidget(self.timer_widget)
 		self.statusBar().addPermanentWidget(self.cmap_widget)
@@ -217,6 +220,9 @@ class MainWindow(QMainWindow):
 	def update_data(self):
 		global icon_map
 		self.data,icon_map = read_files(self.files, self.vfiles)
+		self.setWindowTitle(f"Mashinky Stats Viewer - "
+			f"{len(self.vfiles)}v+{len(self.files)}m files, "
+			f"{len(self.data)} entities, {len(icon_map)} tcoords")
 		#print(repr(icon_map))
 		print(len(icon_map), "tcoords")
 		filt = lambda f: [r.index for r in self.data if f(r)]
@@ -272,6 +278,7 @@ class MainWindow(QMainWindow):
 				dat = self.data[i][f]
 				txt = fmt_cell(f, dat)
 				item = QTableWidgetItem(txt)
+				pls_help_bug.append(None)
 				if len(txt) > 10:
 					item.setToolTip(txt)
 				bin = self.data[i].cid if tbl is not self.ui.tbl_engines else None
@@ -299,6 +306,7 @@ class MainWindow(QMainWindow):
 			for r in range(tbl.rowCount()):
 				key = int(tbl.item(r,idx_c).text())
 				item = tbl.item(r,c)
+				pls_help_bug.append(None)
 				dat = self.data[key][f]
 				self.color(dat, item, params, self.data[key].cid if idx != 0 else None, f)
 		self.table_last_cmap[idx] = self.active_cmap
@@ -344,21 +352,32 @@ class MainWindow(QMainWindow):
 			return {None: minmax(l)}
 
 	def color(self, d, item, params, bin, f):
-		if params and self.active_cmap and d != '':
-			try:
-				t = cmap.inv_lerp(params[bin][0], params[bin][1], float(d))
-				c = self.active_cmap.interpolate(t)
-				c.setAlphaF(.8)
-				item.setBackground(c)
-				pls_help_bug.append(None)
-				return True
-			except ValueError:
-				print(f"color VE {f} {repr(d)} {repr(params)}[{repr(bin)}]={repr(params[bin])}")
+		if self.active_cmap and d != '':
+			t = -1
+			if params:
+				try:
+					t = cmap.inv_lerp(params[bin][0], params[bin][1], float(d))
+				except ValueError:
+					print(f"color VE {f} {repr(d)} {repr(params)}[{repr(bin)}]={repr(params[bin])}")
+					return False
+				except KeyError:
+					print(f"color KE {f} {repr(d)} {repr(params)}[{repr(bin)}]")
+					#item.setBackground(QColor.fromRgbF(1,0,0,1))
+					return False
+			elif Row.__dict__[f].disp == Disp.Parity:
+				if int(d) % 2 == 1:
+					t = 1/3
+				else:
+					t = 2/3
+			elif Row.__dict__[f].disp == Disp.Null:
 				return False
-			except KeyError:
-				print(f"color KE {f} {repr(d)} {repr(params)}[{repr(bin)}]")
-				#item.setBackground(QColor.fromRgbF(1,0,0,1))
-				return False
+			else:
+				raise ValueError(f"Unknown disposition? {f} {repr(d)} {repr(bin)} {Row.__dict__[f].disp}")
+			c = self.active_cmap.interpolate(t)
+			c.setAlphaF(.8)
+			item.setBackground(c)
+			pls_help_bug.append(None)
+			return True
 		else:
 			return False
 
@@ -417,6 +436,7 @@ class MainWindow(QMainWindow):
 						item.setText(new)
 						# change to setFont to set underline or italic
 						item.setBackground(red)
+						pls_help_bug.append(None)
 						self.color(dat, item, params, self.data[key].cid if idx != 0 else None, f)
 						count = count + 1
 					elif item.background() != QBrush():
@@ -426,8 +446,9 @@ class MainWindow(QMainWindow):
 			if (sort):
 				tbl.setSortingEnabled(True)
 				self.reset_labels_for(tbl)
-		self.statusBar().showMessage("Updated " + ", ".join(
-			(str(c) for c in counts)) + " items")
+		if sum(counts):
+			self.statusBar().showMessage("Updated " + ", ".join(
+				(str(c) for c in counts)) + " items")
 		return True
 
 	@Slot(int)
@@ -467,6 +488,7 @@ class MainWindow(QMainWindow):
 				l.setBackground(QColor.fromHslF(0.542, .8, .8, .6))
 			else:
 				l.setBackground(QColor.fromHslF(0.333, .7, .85, .6))
+			pls_help_bug.append(None)
 
 	def tbl_click(self, tbl):
 		@Slot(int, int)

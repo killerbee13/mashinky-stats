@@ -1,6 +1,4 @@
 # This Python file uses the following encoding: utf-8
-import collections
-from dataclasses import dataclass
 
 # Physical/mathematical constants
 KM_PER_MI = 1.609344
