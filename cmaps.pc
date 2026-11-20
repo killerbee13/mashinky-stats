@@ -246,9 +246,7 @@ Other tables are either non-copyrightable or are original works.
 	ff0000 ffff00 00a933
 :Pure R-Y-G:3
 	ff0000 ffff00 00ff00
-:Turbo R-O-G:116
-	c12302 c32503 c52603 c82803 ca2a04 cc2b04 ce2d04 d02f05
-	d23105 d43305 d63506 d83706 da3907 dc3b07 dd3d08 df3f08
+:Turbo R-O-G:100
 	e14109 e2430a e4450a e5470b e7490c e84b0c ea4e0d eb500e
 	ec530f ed5510 ef5811 f05b12 f15d13 f26014 f36315 f46617
 	f56918 f66c19 f76f1a f8721c f9751d f9781e fa7b1f fb7e21

@@ -16,7 +16,7 @@ from ui_mainwindow import Ui_MainWindow
 
 import constants as C
 from mashinky_stats import handle_cli, find_files, read_files
-from TableModel import Disp, Row, token_supply, adj_costs, rnd
+from TableModel import Disp, Row, token_supply, adj_costs, rnd, unknown_keys
 import cmap
 
 pls_help_bug = []
@@ -25,6 +25,8 @@ def translate_header(l):
 	return Row.__dict__.get(l).tbl if l in Row.__dict__ else l
 
 def fmt_cell(field, contents):
+	if contents is None:
+		return ''
 	if field == 'index':
 		return ('     '+str(contents))[-5:]
 	else:
@@ -248,6 +250,9 @@ class MainWindow(QMainWindow):
 	def do_read_files(self):
 		global icon_map
 		self.data,icon_map = read_files(self.files, self.vfiles)
+		with open('unknown_keys.txt', 'w') as f:
+			for k,v in unknown_keys.items():
+				print(f"{repr(k)}={repr(v)}", file=f)
 
 
 	@log_timer()
@@ -305,17 +310,20 @@ class MainWindow(QMainWindow):
 			#print(d)
 			params = self.params(d, f, tbl is not self.ui.tbl_engines)
 			for r, i in enumerate(d):
-				dat = self.data[i]
-				txt = fmt_cell(f, dat[f])
-				item = QTableWidgetItem(txt)
-				pls_help_bug.append(None)
-				if len(txt) > 10:
-					item.setToolTip(txt)
-				self.color(dat, item, params, tbl, f)
-				tbl.setItem(r, c, item)
-				pls_help_bug.append(None)
-				vh.resizeSection(r, 22)
-				pls_help_bug.append(None)
+				try:
+					dat = self.data[i]
+					txt = fmt_cell(f, dat[f])
+					item = QTableWidgetItem(txt)
+					pls_help_bug.append(None)
+					if len(txt) > 10:
+						item.setToolTip(txt)
+					self.color(dat, item, params, tbl, f)
+					tbl.setItem(r, c, item)
+					pls_help_bug.append(None)
+					vh.resizeSection(r, 22)
+					pls_help_bug.append(None)
+				except AttributeError:
+					pass
 		#vh.setResizeContentsPrecision(1)
 		#vh.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 		h = tbl.horizontalHeader()
@@ -372,6 +380,8 @@ class MainWindow(QMainWindow):
 					pass
 				except ValueError:
 					pass
+				except AttributeError:
+					pass
 			return {k: minmax(b) for k,b in bins.items()}
 		else:
 			l = []
@@ -391,7 +401,7 @@ class MainWindow(QMainWindow):
 	def color(self, dat, item, params, tbl, f):
 		"""Set the background color on item from the current cmap.
 		Return value is true when the color of item was updated."""
-		if self.active_cmap and dat[f] != '':
+		if self.active_cmap and dat[f] != '' and dat[f] is not None:
 			d = dat[f]
 			bin = dat.cid if tbl is not self.ui.tbl_engines else None
 			t = -1
@@ -400,6 +410,9 @@ class MainWindow(QMainWindow):
 					t = cmap.inv_lerp(params[bin][0], params[bin][1], float(d))
 				except ValueError:
 					print(f"color VE {f} {repr(d)} {repr(params)}[{repr(bin)}]={repr(params[bin])}")
+					return False
+				except TypeError:
+					print(f"color TE {f} {repr(d)} {repr(params)}[{repr(bin)}]={repr(params[bin])}")
 					return False
 				except KeyError:
 					print(f"color KE {f} {repr(d)} {repr(params)}[{repr(bin)}]")

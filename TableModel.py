@@ -1,4 +1,5 @@
 # This Python file uses the following encoding: utf-8
+from collections import defaultdict
 from enum import Enum, auto
 from pathlib import Path
 import math
@@ -16,6 +17,8 @@ import constants as C
 class _default:
 	def __bool__(self):
 		return False
+	def __repr__(self):
+		return 'Default'
 Default = _default()
 _default.__new__ = lambda self, *args: Default
 _default.__call__ = lambda self, *args: Default
@@ -59,7 +62,7 @@ class KeyBase(FieldBase):
 	xml: Optional[str] = None
 	def __init__(self, U: Type, csv: Optional[str], tbl: Optional[str],
 		xml: Optional[str] = None, disp: Disp = Default, bin: Any = None):
-		super().__init__(U, csv, tbl, disp, bin)
+		super().__init__(U, csv, otherwise(tbl, otherwise(csv, xml)), disp, bin)
 		object.__setattr__(self, 'xml', xml)
 		object.__setattr__(self,'_key_name', csv)
 
@@ -148,12 +151,12 @@ def table_field(U: T, tbl: str, /, xml : Optional[str] = None,
 	return field(U, None, tbl, xml=xml, default=default, **kwargs)
 def xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default,
 	default: Optional[T] = Default, **kwargs):
-	"""Non-CSV fields"""
-	return field(U, None, tbl, xml=xml, default=default, **kwargs)
+	"""Non-CSV fields only meant for the 'All' table"""
+	return field(U, None, otherwise(tbl, f"xml:{xml}"), xml=xml, default=default, **kwargs)
 def zero_xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default, **kwargs):
-	return field(U, None, tbl, xml=xml, default=0, **kwargs)
+	return xml_field(U, xml, tbl=tbl, default=0, **kwargs)
 def default_xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default, **kwargs):
-	return field(U, None, tbl, xml=xml, default=None, **kwargs)
+	return xml_field(U, xml, tbl=tbl, default=None, **kwargs)
 
 def generated(first, *args, **kwargs):
 	"""Generates a field from others. Cannot have an xml key.
@@ -167,6 +170,8 @@ def generated(first, *args, **kwargs):
 			owner = None
 			def __init__(self):
 				super().__init__(result, csv, tbl, disp, bin)
+				if not self.tbl:
+					print(f"no tbl: {repr(csv)} {repr(tbl)} {repr(disp)} {repr(bin)} {repr(result)}")
 			def is_default(self, *args):
 				return True
 			def __repr__(self):
@@ -216,6 +221,8 @@ def generated(first, *args, **kwargs):
 class Cost(dict[str, float]):
 	pass
 
+unknown_keys = defaultdict(set)
+
 def finalize(cls):
 	def subscript(self, field):
 		if isinstance(cls.__dict__[field], FieldBase):
@@ -258,6 +265,7 @@ def finalize(cls):
 	cls.__repr__ = rep
 	#def field_str(self, field):
 
+	ignore_fields = cls.ignore_fields if 'ignore_fields' in cls.__dict__ else []
 	init_fields = {}
 	out_fields = {}
 	for k,v in dict(cls.__dict__).items():
@@ -265,6 +273,8 @@ def finalize(cls):
 			f = {'csv': v.csv, 'tbl': v.tbl}
 			if isinstance(v, KeyBase):
 				f |= {'xml': v.xml}
+				if v.xml in ignore_fields:
+					raise ValueError(f"Ignoring a defined field {v.xml}")
 				if v.is_default():
 					f |= {'default': v.default}
 				init_fields |= {k: f}
@@ -282,6 +292,8 @@ def finalize(cls):
 				else:
 					if not cls.__dict__[k].is_default():
 						raise ValueError()
+			elif k in ignore_fields:
+				pass
 			else:
 				# unexpected kwargs
 				raise ValueError(f"{cls.__name__}.assign_args(): "\
@@ -319,6 +331,14 @@ def finalize(cls):
 						U = cls.__annotations__[f]
 						if type(v) is U or type(v) in typing.get_args(U) or U is Any:
 							r.__setattr__(f, v)
+						elif variants := typing.get_args(U):
+							try:
+								if len(variants) == 2 and types.NoneType in variants:
+									r.__setattr__(f, variants[int(not variants.index(types.NoneType))](v))
+								else:
+									raise TypeError(f"Type {type(v)} not in union {U} {'|'.join((str(x) for x in typing.get_args(U)))}")
+							except TypeError as e:
+									raise TypeError(f"Type {type(v)} not in union {U} {'|'.join((str(x) for x in typing.get_args(U)))}") from e
 						else:
 							r.__setattr__(f,U(v))
 						# safe because the loop ends at the break
@@ -327,7 +347,10 @@ def finalize(cls):
 						del obj[k]
 						break
 				else:
-					# unexpected key
+					if k not in ignore_fields:
+						# unexpected key
+						print(f"Unknown key {repr(k)}={repr(v)}")
+						unknown_keys[k].add(v)
 					pass
 			# unexpected keys
 			if obj:
@@ -403,7 +426,15 @@ class Row:
 	length_b = zero_xml_field(float, 'length')
 	length_head = zero_xml_field(float, 'head_length')
 	length_tail = zero_xml_field(float, 'tail_length')
+	# I think there is more to this
 	length = generated(lambda r: r.length_b + r.length_head + r.length_tail, C.LENGTH, result=float, disp=Disp.Negative)
+
+	# this seems to work on a presence basis?
+	depot_upgrade = default_xml_field(Optional[int], 'depo_upgrade', tbl='Depot Upgrade')
+	# no idea what these are for
+	flags = xml_field(Optional[str], 'flags', tbl='Flags', default="")
+	# sets denote compatibility classes
+	set = xml_field(Optional[str], 'set', tbl='Set', default="")
 
 	#   Prime movers:
 	power = field(float, C.POWER, xml='power', default=0.)
@@ -417,6 +448,7 @@ class Row:
 		else:
 			return self.max_speed_reverse
 	weight = generated(lambda r: r.weight_full, C.WEIGHT, result=float, disp=Disp.Negative)
+	bidirectional = default_xml_field(Optional[int], 'bidirectional', tbl="Bidirectional")
 
 	#   Trains:
 	@generated(C.TRACTION, result=float, disp=Disp.Positive)
@@ -424,6 +456,7 @@ class Row:
 		return math.floor(safe_div(self.power*C.TRACTION_SCALE, self.max_speed))
 	towage = generated(lambda r: r.traction - r.weight_full, C.TOWAGE, result=float)
 	throughput = generated(lambda r: r.towage*r.max_speed, C.THROUGHPUT, result=float)
+
 
 	# Fuel
 	raw_cost = table_field(str, None, xml='fuel_cost', default='')
@@ -462,6 +495,9 @@ class Row:
 			return round(100*(float(effect.group(1))-1))
 		else:
 			return ''
+
+	#   Aircraft:
+	runway_length_needed = default_xml_field(Optional[int], 'runway_length_needed', tbl='Runway Length')
 
 	# Ratios and composites:
 	#   Prime movers:
@@ -540,6 +576,23 @@ class Row:
 		return self.vehicle_type == 1
 	def is_aircraft(self):
 		return self.vehicle_type == 3
+
+	ignore_fields =  [
+		'air_inertia', 'air_inertia_freq', 'air_inertia_limits',
+		'air_inertia_noise', 'anim_speed', 'cost', 'flight_altitude',
+		'front_wheel', 'head_front_wheel', 'head_hipoly', 'head_lowpoly',
+		'head_rear_wheel', 'hipoly', 'inertia', 'inertia_freq', 'inertia_limits',
+		'inertia_noise', 'lowpoly', 'particle', 'particle_air',
+		'particle_emit_delay', 'particle_emit_delay_jitter',
+		'particle_emit_position', 'particle_indoor', 'particle_side',
+		'particle_side_indoor', 'pivot', 'rear_wheel', 'sell', 'shader',
+		'sound_breaks', 'sound_crash', 'sound_engine_fast', 'sound_engine_medium',
+		'sound_engine_slow', 'sound_engine_speed', 'sound_engine_standby',
+		'sound_engine_start', 'sound_engine_stop', 'sound_ref_max_speed',
+		'sound_touchdown', 'sound_tunel', 'tail_front_wheel', 'tail_hipoly',
+		'tail_lowpoly', 'tail_rear_wheel',
+		'level', 'buy',
+	]
 
 @finalize
 class tcoords:

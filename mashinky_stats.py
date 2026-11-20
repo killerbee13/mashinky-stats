@@ -150,8 +150,10 @@ def read_files(files, vfiles):
 		out = []
 		try:
 			for file in files:
+				#print(f"file {file}:")
 				dom = BeautifulSoup(slurp(file), "lxml")
 				for tag in dom.find_all('wagontype'):
+					#print(f"tag {tag['name']}")
 					out.append(Row.from_xml(tag.attrs, source=file, vanilla=vanilla, index=idx))
 					#print(out[-1].asdict(False))
 					idx = idx + 1
