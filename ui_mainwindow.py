@@ -16,13 +16,13 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
     QIcon, QImage, QKeySequence, QLinearGradient,
     QPainter, QPalette, QPixmap, QRadialGradient,
     QTransform)
-from PySide6.QtWidgets import (QAbstractScrollArea, QAbstractSpinBox, QApplication, QCheckBox,
-    QComboBox, QFormLayout, QFrame, QGridLayout,
-    QGroupBox, QHeaderView, QLabel, QLineEdit,
-    QMainWindow, QMenu, QMenuBar, QPlainTextEdit,
-    QPushButton, QScrollArea, QSizePolicy, QSpinBox,
-    QStatusBar, QTabWidget, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QAbstractSpinBox, QApplication,
+    QCheckBox, QComboBox, QFormLayout, QFrame,
+    QGridLayout, QGroupBox, QHeaderView, QLabel,
+    QLineEdit, QMainWindow, QMenu, QMenuBar,
+    QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy,
+    QSpinBox, QStatusBar, QTabWidget, QTableWidget,
+    QTableWidgetItem, QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -150,6 +150,7 @@ class Ui_MainWindow(object):
         self.tbl_engines = QTableWidget(self.tab_engines)
         self.tbl_engines.setObjectName(u"tbl_engines")
         self.tbl_engines.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.tbl_engines.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tbl_engines.setAlternatingRowColors(True)
         self.tbl_engines.setCornerButtonEnabled(False)
         self.tbl_engines.horizontalHeader().setMinimumSectionSize(16)
@@ -166,6 +167,7 @@ class Ui_MainWindow(object):
         self.tbl_wagons = QTableWidget(self.tab_wagons)
         self.tbl_wagons.setObjectName(u"tbl_wagons")
         self.tbl_wagons.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.tbl_wagons.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tbl_wagons.setAlternatingRowColors(True)
         self.tbl_wagons.setCornerButtonEnabled(False)
         self.tbl_wagons.horizontalHeader().setMinimumSectionSize(16)
@@ -181,6 +183,7 @@ class Ui_MainWindow(object):
         self.tbl_vehicles = QTableWidget(self.tab_vehicles)
         self.tbl_vehicles.setObjectName(u"tbl_vehicles")
         self.tbl_vehicles.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.tbl_vehicles.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tbl_vehicles.setAlternatingRowColors(True)
         self.tbl_vehicles.setCornerButtonEnabled(False)
         self.tbl_vehicles.horizontalHeader().setMinimumSectionSize(16)
@@ -196,6 +199,7 @@ class Ui_MainWindow(object):
         self.tbl_aircraft = QTableWidget(self.tab_aircraft)
         self.tbl_aircraft.setObjectName(u"tbl_aircraft")
         self.tbl_aircraft.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.tbl_aircraft.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tbl_aircraft.setAlternatingRowColors(True)
         self.tbl_aircraft.setCornerButtonEnabled(False)
         self.tbl_aircraft.horizontalHeader().setMinimumSectionSize(16)
@@ -211,6 +215,7 @@ class Ui_MainWindow(object):
         self.tbl_all = QTableWidget(self.tab_all)
         self.tbl_all.setObjectName(u"tbl_all")
         self.tbl_all.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.tbl_all.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tbl_all.setAlternatingRowColors(True)
         self.tbl_all.setCornerButtonEnabled(False)
         self.tbl_all.horizontalHeader().setMinimumSectionSize(16)

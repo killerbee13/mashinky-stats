@@ -47,9 +47,16 @@ def rgb_from_hex(code):
 def lerpColors(a: QColor, b: QColor, t: float):
 	return QColor.fromRgbF(*(lerp(ca, cb, t) for ca,cb in zip(a.getRgbF(), b.getRgbF())))
 
+def reverse_name(name: str):
+	if name.endswith(' (R)'):
+		return name[:-4]
+	else:
+		return name + ' (R)'
+
 @dataclass
 class cmap:
 	map: list[QColor]
+	name: str = None
 	def interpolate(self, val):
 		t,i = math.modf(val*(len(self.map)-1))
 		if 0 <= i < len(self.map)-1:
@@ -68,7 +75,7 @@ class cmap:
 	def __len__(self):
 		return len(self.map)
 	def __reversed__(self):
-		return cmap(list(reversed(self.map)))
+		return cmap(list(reversed(self.map)), reverse_name(self.name))
 
 
 _ws = re.compile('[ \t\r\n]+')
@@ -85,7 +92,7 @@ def from_str(cdata):
 		length = int(tokens[0])
 		colors = [rgb_from_hex(s) for s in tokens[1:] if s]
 		assert(length == len(colors))
-		ret |= {name: cmap(colors)}
+		ret |= {name: cmap(colors, name)}
 	return ret
 
 def from_file(path):
