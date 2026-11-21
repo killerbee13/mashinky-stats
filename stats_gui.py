@@ -16,7 +16,7 @@ from ui_mainwindow import Ui_MainWindow
 
 import constants as C
 from mashinky_stats import handle_cli, find_files, read_files
-from TableModel import Disp, Row, token_supply, adj_costs, rnd, unknown_keys
+from row import Disp, Row, token_supply, adj_costs, rnd, unknown_keys
 import cmap
 
 pls_help_bug = []

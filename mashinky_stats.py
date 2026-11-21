@@ -7,7 +7,7 @@ import warnings
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
 import constants as C
-from TableModel import (Row, tcoords, token_supply, parse_eras, rnd,
+from row import (Row, tcoords, token_supply, parse_eras, rnd,
 	train_row_labels, wagon_row_labels, vehicle_row_labels,
 	train_direct_labels, wagon_direct_labels, all_labels)
 

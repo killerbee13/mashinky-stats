@@ -9,9 +9,6 @@ import typing
 from typing import Any, Optional, Type, TypeVar
 from dataclasses import dataclass
 
-from PySide6.QtCore import QAbstractTableModel, QSortFilterProxyModel
-#from PySide6.QtWidgets import
-
 import constants as C
 
 class _default:
@@ -716,13 +713,3 @@ labels_by_type = {
 	"aircraft": vehicle_row_labels,
 	"all": all_labels
 }
-
-# QSQLITE_ENABLE_REGEXP
-class TableModel(QAbstractTableModel):
-	data: list[Row]
-	def __init__(self):
-		super().__init__()
-		pass
-
-class Proxy(QSortFilterProxyModel):
-	pass
