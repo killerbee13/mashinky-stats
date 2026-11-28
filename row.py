@@ -1,6 +1,7 @@
 # This Python file uses the following encoding: utf-8
 from collections import defaultdict
 from enum import Enum, auto
+import pathlib
 from pathlib import Path
 import math
 import re
@@ -11,6 +12,28 @@ from dataclasses import dataclass
 
 import constants as C
 
+time_speed = 0.33
+tick_rate = 0.1
+token_supply = {
+	C.CASH: 1000.0, C.COAL: 500.0, C.DIESEL: 250.0, C.ELECTRIC: 0.0
+}
+
+fuel_per_year = (tick_rate*365/time_speed)/5.0
+
+adj_scale = 1000
+fixed_scale = {C.CASH: 1000, C.COAL: 1000, C.DIESEL: 1000, C.ELECTRIC: 1000}
+token_by_label = {
+	"F1283C03": C.COAL, "F29BF6C1": C.DIESEL,
+	"F9D8BF64": C.ELECTRIC}
+cargo_by_label = {
+	"0BA458C8": "Passenger",	"0F822763": "Mail",  	"3199AA74": "Logs",
+	"448DDF23": "Lumber",   	"6ACBCBA9": "Coal",  	"61A13BCE": "Ore",
+	"7C13D1C9": "Iron",     	"19CFBDA7": "Oil",   	"53F1B093": "Diesel",
+	"B388ED8C": "Goods",    	"94032E35": "Sand",  	"88D1A491": "Steel",
+	"C74198A7": "Food",     	"762F8F3E": "Limestone","8DFA75B5": "Cement",
+	"9A988702": "Garbage"
+}
+
 class _default:
 	def __bool__(self):
 		return False
@@ -20,6 +43,26 @@ Default = _default()
 _default.__new__ = lambda self, *args: Default
 _default.__call__ = lambda self, *args: Default
 otherwise = lambda a, b: a if a is not Default else b
+
+def to_sql(value):
+	match value:
+		case None | _default():
+			return 'NULL'
+		case str(s):
+			return repr(s)
+		case pathlib.Path() as s:
+			return repr(str(s))
+		case bool(x):
+			return str(x).upper()
+		case int(x) | float(x):
+			return x
+def map_to_case(map, ref, default=None):
+	ret = f'CASE {ref} '
+	for k,v in map.items():
+		ret += f'WHEN {to_sql(k)} THEN {to_sql(v)} '
+	ret += 'END'
+	return ret
+
 T = TypeVar('T')
 safe_div = lambda a, b: a/b if b else 0.
 class Disp(Enum):
@@ -37,6 +80,7 @@ class FieldBase:
 	disp: Disp = Disp.Null
 	bin : Any = None
 	_key_name: str = None
+	sql: bool = True
 	def __set_name__(self, owner, name):
 		if not isinstance(owner, type):
 			object.__setattr__(self, 'owner', owner)
@@ -44,10 +88,11 @@ class FieldBase:
 	def _key(self):
 		return f"key-{self._key_name}"
 	def __init__(self, U: Type, csv: Optional[str], tbl: Optional[str],
-		disp: Disp = Default, bin: Any = None):
+		disp: Disp = Default, bin: Any = None, sql: bool = True):
 		object.__setattr__(self, 'csv', csv)
 		object.__setattr__(self, 'tbl', otherwise(tbl, csv))
 		object.__setattr__(self, 'annotation', U)
+		object.__setattr__(self, 'sql', sql)
 		if disp is Default:
 			if U is float or U is int or float in typing.get_args(U) or int in typing.get_args(U):
 				object.__setattr__(self, 'disp', Disp.Positive)
@@ -58,24 +103,25 @@ class FieldBase:
 class KeyBase(FieldBase):
 	xml: Optional[str] = None
 	def __init__(self, U: Type, csv: Optional[str], tbl: Optional[str],
-		xml: Optional[str] = None, disp: Disp = Default, bin: Any = None):
-		super().__init__(U, csv, otherwise(tbl, otherwise(csv, xml)), disp, bin)
+		xml: Optional[str] = None, disp: Disp = Default, bin: Any = None,
+		sql: bool = True):
+		super().__init__(U, csv, otherwise(tbl, otherwise(csv, xml)), disp, bin, sql)
 		object.__setattr__(self, 'xml', xml)
 		object.__setattr__(self,'_key_name', csv)
 
 def field(U: Type, csv: Optional[str], tbl: Optional[str] = Default, /,
 	xml : Optional[str] = None, default: Optional[T] = Default,
-	disp: Disp = Default, bin: Any = None):
+	disp: Disp = Default, bin: Any = None, sql: bool = True):
 	"""def field(U: Type, csv: Optional[str], tbl: Optional[str] = csv, /,
 		xml : Optional[str] = None, default : Optional[T] = Default
-		disp: Disp = Disp.Positive):
+		disp: Disp = Disp.Positive, bin: Any = None, sql: bool = True):
 	If only csv is specified, tbl reuses that value. If default is specified,
 	the field has that as its default value, otherwise there is no default."""
 	# name lookup gets confused by the class shadowing the closure-captured args
 	class Key(KeyBase):
 		owner = None
 		def __init__(self):
-			super().__init__(U, csv, tbl, xml, disp, bin)
+			super().__init__(U, csv, tbl, xml, disp, bin, sql)
 		def __set_name__(self, owner, name):
 			super().__set_name__(owner, name)
 			if default is not Default:
@@ -157,16 +203,21 @@ def default_xml_field(U: T, xml : Optional[str] = None, /, tbl: str = Default, *
 
 def generated(first, *args, **kwargs):
 	"""Generates a field from others. Cannot have an xml key.
-	generated(fun: types.FunctionType, csv: Optional[str], tbl: Optional[str] = Default):
+	generated(fun: types.FunctionType, csv: Optional[str],
+		tbl: Optional[str] = Default, disp: Disp = Default, bin = None,
+		generator: Optional[str] = None, sql: bool = True):
 		Value of obj.gen is computed as fun(obj). tbl defaults to csv
 	@generated(csv: str, tbl: Optional[str] = Default):
 		decorator version of the above"""
 	def impl(fun: types.FunctionType, csv: Optional[str],
-		tbl: Optional[str] = Default, result=None, cache=True, disp=Default, bin=None):
+		tbl: Optional[str] = Default, result=None, cache=True, disp=Default,
+		bin=None, generator: Optional[str]=None, sql: bool = True):
+		generator_ = generator
 		class Gen(FieldBase):
 			owner = None
+			generator = generator_
 			def __init__(self):
-				super().__init__(result, csv, tbl, disp, bin)
+				super().__init__(result, csv, tbl, disp, bin, sql)
 				if not self.tbl:
 					print(f"no tbl: {repr(csv)} {repr(tbl)} {repr(disp)} {repr(bin)} {repr(result)}")
 			def is_default(self, *args):
@@ -246,6 +297,10 @@ def finalize(cls):
 	def is_default(self, field):
 		return cls.__dict__[field].is_default(self)
 	cls.is_default = is_default
+	def is_generated(field):
+		return isinstance(cls.__dict__[field], FieldBase) \
+			and not isinstance(cls.__dict__[field], KeyBase)
+	cls.is_generated = staticmethod(is_generated)
 	def field_rep(self, field):
 		if field in self:
 			if self.is_default(field):
@@ -265,6 +320,7 @@ def finalize(cls):
 	ignore_fields = cls.ignore_fields if 'ignore_fields' in cls.__dict__ else []
 	init_fields = {}
 	out_fields = {}
+	gen_fields = []
 	for k,v in dict(cls.__dict__).items():
 		if isinstance(v, FieldBase):
 			f = {'csv': v.csv, 'tbl': v.tbl}
@@ -275,6 +331,8 @@ def finalize(cls):
 				if v.is_default():
 					f |= {'default': v.default}
 				init_fields |= {k: f}
+			else:
+				gen_fields.append(k)
 			out_fields |= {k: f}
 	#print(repr(init_fields))
 	#print(repr(out_fields))
@@ -284,7 +342,10 @@ def finalize(cls):
 		for k,v in kwargs.items():
 			if k in fields:
 				if v is not Default:
-					self.__setattr__(k, cls.__annotations__[k](v))
+					try:
+						self.__setattr__(k, cls.__annotations__[k](v))
+					except TypeError as e:
+						self.__setattr__(k, v)
 					del fields[k]
 				else:
 					if not cls.__dict__[k].is_default():
@@ -308,7 +369,7 @@ def finalize(cls):
 				f"missing required keyword arguments {list(fields.keys())}")
 	def from_args(cls, /, strict=False, **kwargs):
 		r = cls()
-		init(r)
+		init(r,  strict=strict, **kwargs)
 		return r
 	cls.from_args = classmethod(from_args)
 	if '__init__' not in cls.__dict__:
@@ -389,6 +450,12 @@ def finalize(cls):
 	def keys():
 		return list(out_fields)
 	cls.keys = staticmethod(keys)
+	def fields():
+		return list(init_fields.keys())
+	cls.fields = staticmethod(fields)
+	def generated():
+		return gen_fields
+	cls.generated = staticmethod(generated)
 	return cls
 
 @finalize
@@ -402,11 +469,11 @@ class test:
 class Row:
 	# XML/core properties: (in XML, shown in game, or very trivially derived)
 	#   Common:
-	name = field(str, C.NAME, xml='name')
 	index = table_field(int, 'Index', disp=Disp.Null)
+	name = field(str, C.NAME, xml='name')
 	source = field(Path, 'source', C.SOURCE, default='')
 	vanilla = table_field(bool, C.VANILLA, default=False)
-	id = field(str, 'id', 'ID', xml=C.ID, default='')
+	id = default_field(Optional[str], 'id', 'ID', xml=C.ID)
 	cid = default_field(Optional[str], C.CID, 'Cargo ID', xml='cargo')
 	vehicle_type = table_field(int, 'vehicle_type', xml='vehicle_type', disp=Disp.Null)
 	track = zero_field(int, None, C.TRACK, xml='track', disp=Disp.Null)
@@ -424,7 +491,9 @@ class Row:
 	length_head = zero_xml_field(float, 'head_length')
 	length_tail = zero_xml_field(float, 'tail_length')
 	# I think there is more to this
-	length = generated(lambda r: r.length_b + r.length_head + r.length_tail, C.LENGTH, result=float, disp=Disp.Negative)
+	length = generated(lambda r: r.length_b + r.length_head + r.length_tail,
+		C.LENGTH, result=float, disp=Disp.Negative,
+		generator='length_b + length_head + length_tail')
 
 	# this seems to work on a presence basis?
 	depot_upgrade = default_xml_field(Optional[int], 'depo_upgrade', tbl='Depot Upgrade')
@@ -436,37 +505,53 @@ class Row:
 	#   Prime movers:
 	power = field(float, C.POWER, xml='power', default=0.)
 	max_speed = field(float, C.SPEED, xml='max_speed', default=0.)
-	max_speed_mph = generated(lambda r: r.max_speed/C.KM_PER_MI, C.SPEED_MPH, result=float)
+	max_speed_mph = generated(lambda r: r.max_speed/C.KM_PER_MI,
+		C.SPEED_MPH, result=float, generator=f'round(max_speed/{C.KM_PER_MI})')
 	max_speed_reverse = zero_field(Any, None, "Reverse speed (km/hr)", xml='max_speed_reverse')
-	@generated("Reverse speed (mph)")
+	@generated("Reverse speed (mph)",
+		generator=f'round(max_speed_reverse/{C.KM_PER_MI})', result=Any)
 	def max_speed_reverse_mph(self):
 		if type(self.max_speed_reverse) is float:
 			return round(self.max_speed_reverse/C.KM_PER_MI)
 		else:
 			return self.max_speed_reverse
-	weight = generated(lambda r: r.weight_full, C.WEIGHT, result=float, disp=Disp.Negative)
+	weight = generated(lambda r: r.weight_full, C.WEIGHT, result=float,
+		disp=Disp.Negative, generator='weight_full', sql=False)
 	bidirectional = default_xml_field(Optional[int], 'bidirectional', tbl="Bidirectional")
 
 	#   Trains:
-	@generated(C.TRACTION, result=float, disp=Disp.Positive)
+	@generated(C.TRACTION, result=float, disp=Disp.Positive,
+		generator=f'floor((power*{C.TRACTION_SCALE})/max_speed)')
 	def traction(self):
 		return math.floor(safe_div(self.power*C.TRACTION_SCALE, self.max_speed))
-	towage = generated(lambda r: r.traction - r.weight_full, C.TOWAGE, result=float)
-	throughput = generated(lambda r: r.towage*r.max_speed, C.THROUGHPUT, result=float)
+	towage = generated(lambda r: r.traction - r.weight_full, C.TOWAGE,
+		result=float, generator='traction - weight_full')
+	throughput = generated(lambda r: r.towage*r.max_speed, C.THROUGHPUT,
+		result=float, generator='towage*max_speed')
 
 
 	# Fuel
 	raw_cost = table_field(str, None, xml='fuel_cost', default='')
-	cost = generated(lambda r: costs(r.raw_cost), C.COSTS_RAW)
-	cash = generated(lambda r: r.cost.get(C.CASH, 0.), C.CASH, tbl="Money", result=float, disp=Disp.Negative)
-	coal = generated(lambda r: r.cost.get(C.COAL, 0.), C.COAL, result=float, disp=Disp.Negative)
-	diesel = generated(lambda r: r.cost.get(C.DIESEL, 0.), C.DIESEL, result=float, disp=Disp.Negative)
-	electric = generated(lambda r: r.cost.get(C.ELECTRIC, 0.), C.ELECTRIC, result=float, disp=Disp.Negative)
-	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST, tbl="Adjusted Cost", cache=False, result=float, disp=Disp.Negative)
+	cost = generated(lambda r: costs(r.raw_cost), C.COSTS_RAW, result=dict)
+	cash = generated(lambda r: r.cost.get(C.CASH, 0.), C.CASH, tbl="Money",
+		result=float, disp=Disp.Negative, generator=f'cost->>\'{C.CASH}\'')
+	coal = generated(lambda r: r.cost.get(C.COAL, 0.), C.COAL,
+		result=float, disp=Disp.Negative, generator=f'cost->>\'{C.COAL}\'')
+	diesel = generated(lambda r: r.cost.get(C.DIESEL, 0.), C.DIESEL,
+		result=float, disp=Disp.Negative, generator=f'cost->>\'{C.DIESEL}\'')
+	electric = generated(lambda r: r.cost.get(C.ELECTRIC, 0.), C.ELECTRIC,
+		result=float, disp=Disp.Negative, generator=f'cost->>\'{C.ELECTRIC}\'')
+	adjcost = generated(lambda r: cost_adj(r.cost), C.ADJCOST,
+		tbl="Adjusted Cost", cache=False, result=float, disp=Disp.Negative)
 
 	#   Cargo carriers:
 	capacity = zero_field(int, C.CARGO, xml='capacity')
-	@generated(C.TYPE)
+	@generated(C.TYPE, result=str,
+		generator=f"""CASE WHEN (vehicle_type=0 AND power=0) THEN
+({map_to_case(cargo_by_label, 'cid')}) ELSE
+({map_to_case(cargo_by_label
+	| {'0BA458C8': 'Pass. Engine', '0F822763': 'Mail Engine'},
+	'cid')}) END""")
 	def ctype(self):
 		ct = cargo_by_label.get(self.cid) or ""
 		if self.vehicle_type == 0 and self.power:
@@ -484,7 +569,7 @@ class Row:
 			return float(effect.group(1))
 		else:
 			return 1
-	@generated(C.BONUS, result=float)
+	@generated(C.BONUS, result=float, generator='round(100*(effect-1))')
 	def bonus(self):
 		effect = re.fullmatch(r'(?:profit\[[^]]*\])\*([0-9]*.?[0-9]*)',
 			self.raw_effect)
@@ -494,30 +579,67 @@ class Row:
 			return ''
 
 	#   Aircraft:
-	runway_length_needed = default_xml_field(Optional[int], 'runway_length_needed', tbl='Runway Length')
+	runway_length_needed = default_xml_field(Optional[int],
+		'runway_length_needed', tbl='Runway Length')
 
 	# Ratios and composites:
 	#   Prime movers:
-	pwt_empty = generated(lambda r: r.power/r.weight_empty, C.PWT_EMPTY, result=float)
-	pwt_full = generated(lambda r: safe_div(r.power, r.weight_full), C.PWT_FULL, result=float)
-	power_per_length = generated(lambda r: r.power/r.length, C.POWER_PER_LENGTH, result=float)
+	pwt_empty = generated(lambda r: r.power/r.weight_empty, C.PWT_EMPTY,
+		result=float, generator='power/weight_empty')
+	pwt_full = generated(lambda r: safe_div(r.power, r.weight_full), C.PWT_FULL,
+		result=float, generator='power/weight_full')
+	power_per_length = generated(lambda r: r.power/r.length, C.POWER_PER_LENGTH,
+		result=float, generator='power/length')
 
 	#   Trains:
-	pwt_loaded = generated(lambda r: safe_div(r.power, r.traction), C.PWT_FULL, result=float)
-	tow_per_length = generated(lambda r: r.towage/r.length, C.TOW_PER_LENGTH, result=float)
+	pwt_loaded = generated(lambda r: safe_div(r.power, r.traction), C.PWT_FULL,
+		result=float, generator='power/traction')
+	tow_per_length = generated(lambda r: r.towage/r.length, C.TOW_PER_LENGTH,
+		result=float, generator='towage/length')
 
 	#   Cargo carriers:
-	profit = generated(lambda r: r.capacity*r.effect, C.PROFITABILITY, result=float)
-	cargo_per_length = generated(lambda r: r.capacity/r.length, C.CARGO_PER_LENGTH, result=float)
-	profit_per_length = generated(lambda r: r.profit/r.length, C.PROFIT_PER_LENGTH, result=float)
-	cargo_per_wt = generated(lambda r: 10*r.capacity/r.weight_full, C.CARGO_PER_WT, result=float)
-	profit_per_wt = generated(lambda r: 10*r.profit/r.weight_full, C.PROFIT_PER_WT, result=float)
+	profit = generated(lambda r: r.capacity*r.effect, C.PROFITABILITY,
+		result=float, generator='capacity/effect')
+	cargo_per_length = generated(lambda r: r.capacity/r.length,
+		C.CARGO_PER_LENGTH, result=float, generator='capacity/length')
+	profit_per_length = generated(lambda r: r.profit/r.length,
+		C.PROFIT_PER_LENGTH, result=float, generator='profit/length')
+	cargo_per_wt = generated(lambda r: 10*r.capacity/r.weight_full,
+		C.CARGO_PER_WT, result=float, generator='10*capacity/weight_full')
+	profit_per_wt = generated(lambda r: 10*r.profit/r.weight_full,
+		C.PROFIT_PER_WT, result=float, generator='10*profit/weight_full')
 
 	#   Units: (i.e. power and capacity both != 0)
-	cargo_throughput = generated(lambda r: r.capacity*r.max_speed, C.TP_CARGO, result=float)
-	profit_throughput = generated(lambda r: r.profit*r.max_speed, C.TP_PROFIT, result=float)
+	cargo_throughput = generated(lambda r: r.capacity*r.max_speed, C.TP_CARGO,
+		result=float, generator='capacity*max_speed')
+	profit_throughput = generated(lambda r: r.profit*r.max_speed, C.TP_PROFIT,
+		result=float, generator='profit*max_speed')
+
+
+	#   Train-specific
+	CD6 = generated(lambda r: r.towage/(6-r.length), C.CD6, result=float,
+		generator='towage/(6-length)')
+	CD8 = generated(lambda r: r.towage/(8-r.length), C.CD8, result=float,
+		generator='towage/(8-length)')
 
 	#   Fuel:
+	@staticmethod
+	def _throughput(name: str, c: str, t: str, tbl: Optional[str]=Default,
+		cache=True):
+		if c == 'adjcost':
+			def f(self):
+				return self.adjcost and self.__getattribute__(t)/(self.adjcost*adj_scale)
+			generator=None
+		else:
+			def f(self):
+				if self.power and self.cost.get(c):
+					return self.__getattribute__(t)/(self.cost.get(c)*fixed_scale[c])
+				else:
+					return ''
+			generator=f"iif({c.lower()} != 0, {t}/({c.lower()}*{fixed_scale[c]}), '')"
+		return generated(f, name, tbl=tbl, cache=cache, sql=cache, result=float,
+			generator=generator)
+
 	def _TP1(self, c: str, t: float) -> float:
 		if self.power and self.cost.get(c):
 			return t/(self.cost.get(c, 0)*fixed_scale[c])
@@ -532,36 +654,43 @@ class Row:
 	def _TPp(self, cur: str) -> float:
 		return self._TP1(cur, self.profit_throughput)
 
-	#   Train-specific
-	CD6 = generated(lambda r: r.towage/(6-r.length), C.CD6, result=float)
-	CD8 = generated(lambda r: r.towage/(8-r.length), C.CD8, result=float)
-
-	TP_adjcost = generated(lambda r: r._TP_ac(r.throughput), C.TP_ADJCOST, cache=False, result=float)
-	TP_cash = generated(lambda r: r._TP(C.CASH), C.TP_CASH, tbl="TP/Money", result=float)
-	TP_coal = generated(lambda r: r._TP(C.COAL), C.TP_COAL, result=float)
-	TP_diesel = generated(lambda r: r._TP(C.DIESEL), C.TP_DIESEL, result=float)
-	TP_electric = generated(lambda r: r._TP(C.ELECTRIC), C.TP_ELECTRIC, result=float)
+	TP_adjcost = _throughput(C.TP_ADJCOST, 'adjcost', 'throughput', cache=False)
+	TP_cash = _throughput(C.TP_CASH, C.CASH, 'throughput', tbl="TP/Money")
+	TP_coal = _throughput(C.TP_COAL, C.COAL, 'throughput')
+	TP_diesel = _throughput(C.TP_DIESEL, C.DIESEL, 'throughput')
+	TP_electric = _throughput(C.TP_ELECTRIC, C.ELECTRIC, 'throughput')
 
 	#   Unit-specific
-	TPc_adjcost = generated(lambda r: r._TP_ac(r.cargo_throughput), C.TPC_ADJCOST, cache=False, result=float)
-	TPp_adjcost = generated(lambda r: r._TP_ac(r.profit_throughput), C.TPP_ADJCOST, cache=False, result=float)
-	TPc_cash = generated(lambda r: r._TPc(C.CASH), C.TPC_CASH, tbl="TPc/Money", result=float)
-	TPp_cash = generated(lambda r: r._TPp(C.CASH), C.TPP_CASH, tbl="TPp/Money", result=float)
-	TPc_coal = generated(lambda r: r._TPc(C.COAL), C.TPC_COAL, result=float)
-	TPp_coal = generated(lambda r: r._TPp(C.COAL), C.TPP_COAL, result=float)
-	TPc_diesel = generated(lambda r: r._TPc(C.DIESEL), C.TPC_DIESEL, result=float)
-	TPp_diesel = generated(lambda r: r._TPp(C.DIESEL), C.TPP_DIESEL, result=float)
-	TPc_electric = generated(lambda r: r._TPc(C.ELECTRIC), C.TPC_ELECTRIC, result=float)
-	TPp_electric = generated(lambda r: r._TPp(C.ELECTRIC), C.TPP_ELECTRIC, result=float)
+	TPc_adjcost = _throughput(C.TPC_ADJCOST, 'adjcost', 'cargo_throughput',
+		cache=False)
+	TPp_adjcost = _throughput(C.TPP_ADJCOST, 'adjcost', 'profit_throughput',
+		cache=False)
+	TPc_cash = _throughput(C.TPC_CASH, C.CASH, 'cargo_throughput',
+		tbl="TPc/Money")
+	TPp_cash = _throughput(C.TPP_CASH, C.CASH, 'profit_throughput',
+		tbl="TPp/Money")
+	TPc_coal = _throughput(C.TPC_COAL, C.COAL, 'cargo_throughput')
+	TPp_coal = _throughput(C.TPP_COAL, C.COAL, 'profit_throughput')
+	TPc_diesel = _throughput(C.TPC_DIESEL, C.DIESEL, 'cargo_throughput')
+	TPp_diesel = _throughput(C.TPP_DIESEL, C.DIESEL, 'profit_throughput')
+	TPc_electric = _throughput(C.TPC_ELECTRIC, C.ELECTRIC, 'cargo_throughput')
+	TPp_electric = _throughput(C.TPP_ELECTRIC, C.ELECTRIC, 'profit_throughput')
+
 
 	#   Wagon-specific
 	def _compound(self, v: float) -> float:
 		return (v/self.length)*(10*v/self.weight_full)
-	compound_efficiency = generated(lambda r: r._compound(r.capacity), C.COMPOUND_EFFICIENCY, result=float)
-	compound_profitability = generated(lambda r: r._compound(r.profit), C.COMPOUND_PROFITABILITY, result=float)
-	density = generated(lambda r: r.weight_full/r.length, C.DENSITY, result=float, disp=Disp.Negative)
-	wt_per_cargo = generated(lambda r: safe_div(r.weight_full, r.capacity), C.WT_PER_CARGO, result=float, disp=Disp.Negative)
-	@generated(C.CARGO_UNIT_WT, result=float, disp=Disp.Negative)
+	compound_efficiency = generated(lambda r: r._compound(r.capacity),
+		C.COMPOUND_EFFICIENCY, result=float, generator='')
+	compound_profitability = generated(lambda r: r._compound(r.profit),
+		C.COMPOUND_PROFITABILITY, result=float, generator='')
+	density = generated(lambda r: r.weight_full/r.length, C.DENSITY,
+		result=float, disp=Disp.Negative, generator='weight_full/length')
+	wt_per_cargo = generated(lambda r: safe_div(r.weight_full, r.capacity),
+		C.WT_PER_CARGO, result=float, disp=Disp.Negative,
+		generator='weight_full/capacity')
+	@generated(C.CARGO_UNIT_WT, result=float, disp=Disp.Negative,
+		generator='(weight_full-weight_empty)/capacity')
 	def cargo_unit_wt(self):
 		return safe_div(self.weight_full-self.weight_empty, self.capacity)
 
@@ -608,27 +737,7 @@ def compare(row1, row2, fields):
 			return False
 	return False
 
-time_speed = 0.33
-tick_rate = 0.1
-token_supply = {
-	C.CASH: 1000.0, C.COAL: 500.0, C.DIESEL: 250.0, C.ELECTRIC: 0.0
-}
 
-fuel_per_year = (tick_rate*365/time_speed)/5.0
-
-adj_scale = 1000
-fixed_scale = {C.CASH: 1000, C.COAL: 1000, C.DIESEL: 1000, C.ELECTRIC: 1000}
-token_by_label = {
-	"F1283C03": C.COAL, "F29BF6C1": C.DIESEL,
-	"F9D8BF64": C.ELECTRIC}
-cargo_by_label = {
-	"0BA458C8": "Passenger",	"0F822763": "Mail",  	"3199AA74": "Logs",
-	"448DDF23": "Lumber",   	"6ACBCBA9": "Coal",  	"61A13BCE": "Ore",
-	"7C13D1C9": "Iron",     	"19CFBDA7": "Oil",   	"53F1B093": "Diesel",
-	"B388ED8C": "Goods",    	"94032E35": "Sand",  	"88D1A491": "Steel",
-	"C74198A7": "Food",     	"762F8F3E": "Limestone","8DFA75B5": "Cement",
-	"9A988702": "Garbage"
-}
 
 
 def rnd(x: T, recip_tol=0) -> T:

@@ -65,6 +65,8 @@ def log_timer(oself=None, print_args=True, quiet=False):
 						return "<list>"
 					elif type(x) is MainWindow:
 						return "window"
+					elif isinstance(x, QApplication):
+						return "app"
 					elif isinstance(x, QWidget):
 						return x.objectName()
 					else:

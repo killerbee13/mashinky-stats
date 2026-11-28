@@ -17,7 +17,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>Mashinky Stats Viewer</string>
+   <string notr="true">Mashinky Stats Viewer</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="sizePolicy">
@@ -72,7 +72,7 @@
           </sizepolicy>
          </property>
          <property name="text">
-          <string>↑</string>
+          <string notr="true">↑</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignHCenter|Qt::AlignTop</set>
@@ -94,7 +94,7 @@
           </size>
          </property>
          <property name="text">
-          <string>Best</string>
+          <string notr="true">Best</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -116,7 +116,7 @@
           </size>
          </property>
          <property name="text">
-          <string>Worst</string>
+          <string notr="true">Worst</string>
          </property>
         </widget>
        </item>
@@ -188,7 +188,7 @@
       </property>
       <widget class="QWidget" name="tab_engines">
        <attribute name="title">
-        <string>Engines</string>
+        <string notr="true">&amp;Engines</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout">
         <item row="0" column="0">
@@ -220,7 +220,7 @@
       </widget>
       <widget class="QWidget" name="tab_wagons">
        <attribute name="title">
-        <string>Wagons</string>
+        <string notr="true">&amp;Wagons</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_3">
         <item row="0" column="0">
@@ -249,7 +249,7 @@
       </widget>
       <widget class="QWidget" name="tab_vehicles">
        <attribute name="title">
-        <string>Vehicles</string>
+        <string notr="true">&amp;Vehicles</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_4">
         <item row="0" column="0">
@@ -278,7 +278,7 @@
       </widget>
       <widget class="QWidget" name="tab_aircraft">
        <attribute name="title">
-        <string>Aircraft</string>
+        <string notr="true">&amp;Aircraft</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_5">
         <item row="0" column="0">
@@ -307,7 +307,7 @@
       </widget>
       <widget class="QWidget" name="tab_all">
        <attribute name="title">
-        <string>All</string>
+        <string notr="true">All</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_8">
         <item row="0" column="0">
@@ -336,7 +336,7 @@
       </widget>
       <widget class="QWidget" name="tab_prefs">
        <attribute name="title">
-        <string>Preferences</string>
+        <string notr="true">&amp;Configuration</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout">
         <property name="spacing">
@@ -414,144 +414,6 @@
                <property name="bottomMargin">
                 <number>0</number>
                </property>
-               <item row="0" column="0">
-                <widget class="QGroupBox" name="groupBox_display">
-                 <property name="sizePolicy">
-                  <sizepolicy hsizetype="Fixed" vsizetype="MinimumExpanding">
-                   <horstretch>0</horstretch>
-                   <verstretch>0</verstretch>
-                  </sizepolicy>
-                 </property>
-                 <property name="minimumSize">
-                  <size>
-                   <width>0</width>
-                   <height>0</height>
-                  </size>
-                 </property>
-                 <property name="maximumSize">
-                  <size>
-                   <width>16777215</width>
-                   <height>16777215</height>
-                  </size>
-                 </property>
-                 <property name="title">
-                  <string>Display configuration</string>
-                 </property>
-                 <property name="alignment">
-                  <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-                 </property>
-                 <property name="flat">
-                  <bool>true</bool>
-                 </property>
-                 <property name="checkable">
-                  <bool>false</bool>
-                 </property>
-                 <layout class="QGridLayout" name="gridLayout_10">
-                  <item row="2" column="1">
-                   <widget class="QCheckBox" name="sel_cmap_inv">
-                    <property name="enabled">
-                     <bool>false</bool>
-                    </property>
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="text">
-                     <string>Reverse</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="1">
-                   <widget class="QComboBox" name="sel_cmap">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="minimumSize">
-                     <size>
-                      <width>60</width>
-                      <height>0</height>
-                     </size>
-                    </property>
-                    <item>
-                     <property name="text">
-                      <string>None</string>
-                     </property>
-                    </item>
-                   </widget>
-                  </item>
-                  <item row="0" column="1">
-                   <widget class="QComboBox" name="sel_unit">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="minimumSize">
-                     <size>
-                      <width>60</width>
-                      <height>0</height>
-                     </size>
-                    </property>
-                    <item>
-                     <property name="text">
-                      <string>kmph</string>
-                     </property>
-                    </item>
-                    <item>
-                     <property name="text">
-                      <string>mph</string>
-                     </property>
-                    </item>
-                   </widget>
-                  </item>
-                  <item row="3" column="1">
-                   <widget class="QPushButton" name="btn_reload_cmaps">
-                    <property name="text">
-                     <string>&amp;Reload cmaps</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="0">
-                   <widget class="QLabel" name="lbl_cmap">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="text">
-                     <string>Colormap</string>
-                    </property>
-                    <property name="buddy">
-                     <cstring>sel_cmap</cstring>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="0" column="0">
-                   <widget class="QLabel" name="lbl_unit">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="text">
-                     <string>Speed unit</string>
-                    </property>
-                    <property name="buddy">
-                     <cstring>sel_unit</cstring>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </widget>
-               </item>
                <item row="0" column="1">
                 <widget class="QGroupBox" name="groupBox_tokens">
                  <property name="sizePolicy">
@@ -573,7 +435,7 @@
                   </size>
                  </property>
                  <property name="title">
-                  <string>Token Budgets</string>
+                  <string notr="true">Token Budgets</string>
                  </property>
                  <property name="flat">
                   <bool>true</bool>
@@ -588,31 +450,72 @@
                   <property name="verticalSpacing">
                    <number>6</number>
                   </property>
-                  <item row="3" column="1">
-                   <widget class="QSpinBox" name="amt_electric">
+                  <item row="1" column="0">
+                   <widget class="QLabel" name="lbl_coal">
                     <property name="sizePolicy">
-                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="text">
+                     <string notr="true">Coal</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>amt_coal</cstring>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="0">
+                   <widget class="QLabel" name="lbl_cash">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="text">
+                     <string notr="true">Money</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>amt_cash</cstring>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="4" rowspan="4" colspan="2">
+                   <widget class="QLabel" name="lbl_adjcost_desc">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
                       <horstretch>0</horstretch>
                       <verstretch>0</verstretch>
                      </sizepolicy>
                     </property>
                     <property name="minimumSize">
                      <size>
-                      <width>50</width>
+                      <width>180</width>
                       <height>0</height>
                      </size>
                     </property>
-                    <property name="maximum">
-                     <number>10000</number>
+                    <property name="maximumSize">
+                     <size>
+                      <width>500</width>
+                      <height>16777215</height>
+                     </size>
                     </property>
-                    <property name="singleStep">
-                     <number>10</number>
+                    <property name="frameShape">
+                     <enum>QFrame::NoFrame</enum>
                     </property>
-                    <property name="stepType">
-                     <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+                    <property name="frameShadow">
+                     <enum>QFrame::Sunken</enum>
                     </property>
-                    <property name="value">
-                     <number>250</number>
+                    <property name="text">
+                     <string notr="true">These inputs are used to configure the &quot;Adjusted Cost&quot; values assigned to each token type, which is the reciprocal of the token budget divided by the reciprocal of the &quot;money&quot; token value, such that the normalized value of a money token is always 1. The calculated value is displayed underneath each box.</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+                    </property>
+                    <property name="wordWrap">
+                     <bool>true</bool>
                     </property>
                    </widget>
                   </item>
@@ -631,10 +534,26 @@
                      </size>
                     </property>
                     <property name="text">
-                     <string>1.0</string>
+                     <string notr="true">1.0</string>
                     </property>
                     <property name="buddy">
                      <cstring>amt_cash</cstring>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="2" column="0">
+                   <widget class="QLabel" name="lbl_diesel">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="text">
+                     <string notr="true">Diesel</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>amt_diesel</cstring>
                     </property>
                    </widget>
                   </item>
@@ -653,121 +572,17 @@
                      </size>
                     </property>
                     <property name="text">
-                     <string>10.00</string>
+                     <string notr="true">10.00</string>
                     </property>
                     <property name="buddy">
                      <cstring>amt_diesel</cstring>
                     </property>
                    </widget>
                   </item>
-                  <item row="1" column="1">
-                   <widget class="QSpinBox" name="amt_coal">
+                  <item row="3" column="0">
+                   <widget class="QLabel" name="lbl_electric">
                     <property name="sizePolicy">
                      <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="minimumSize">
-                     <size>
-                      <width>50</width>
-                      <height>0</height>
-                     </size>
-                    </property>
-                    <property name="maximum">
-                     <number>10000</number>
-                    </property>
-                    <property name="singleStep">
-                     <number>10</number>
-                    </property>
-                    <property name="stepType">
-                     <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
-                    </property>
-                    <property name="value">
-                     <number>500</number>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="1">
-                   <widget class="QSpinBox" name="amt_diesel">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="minimumSize">
-                     <size>
-                      <width>50</width>
-                      <height>0</height>
-                     </size>
-                    </property>
-                    <property name="maximum">
-                     <number>10000</number>
-                    </property>
-                    <property name="singleStep">
-                     <number>10</number>
-                    </property>
-                    <property name="stepType">
-                     <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
-                    </property>
-                    <property name="value">
-                     <number>500</number>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="2" column="0">
-                   <widget class="QLabel" name="lbl_diesel">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="text">
-                     <string>Diesel</string>
-                    </property>
-                    <property name="buddy">
-                     <cstring>amt_diesel</cstring>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="0">
-                   <widget class="QLabel" name="lbl_coal">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="text">
-                     <string>Coal</string>
-                    </property>
-                    <property name="buddy">
-                     <cstring>amt_coal</cstring>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="0" column="0">
-                   <widget class="QLabel" name="lbl_cash">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="text">
-                     <string>Money</string>
-                    </property>
-                    <property name="buddy">
-                     <cstring>amt_cash</cstring>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="0" column="3" rowspan="4">
-                   <widget class="Line" name="line">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
                       <horstretch>0</horstretch>
                       <verstretch>0</verstretch>
                      </sizepolicy>
@@ -778,49 +593,8 @@
                       <height>0</height>
                      </size>
                     </property>
-                    <property name="orientation">
-                     <enum>Qt::Vertical</enum>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="1" column="2">
-                   <widget class="QLabel" name="lbl_adj_coal">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="minimumSize">
-                     <size>
-                      <width>30</width>
-                      <height>0</height>
-                     </size>
-                    </property>
                     <property name="text">
-                     <string>10.00</string>
-                    </property>
-                    <property name="buddy">
-                     <cstring>amt_coal</cstring>
-                    </property>
-                   </widget>
-                  </item>
-                  <item row="3" column="2">
-                   <widget class="QLabel" name="lbl_adj_electric">
-                    <property name="sizePolicy">
-                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                      <horstretch>0</horstretch>
-                      <verstretch>0</verstretch>
-                     </sizepolicy>
-                    </property>
-                    <property name="minimumSize">
-                     <size>
-                      <width>30</width>
-                      <height>0</height>
-                     </size>
-                    </property>
-                    <property name="text">
-                     <string>10.00</string>
+                     <string notr="true">Electricity</string>
                     </property>
                     <property name="buddy">
                      <cstring>amt_electric</cstring>
@@ -858,47 +632,66 @@
                     </property>
                    </widget>
                   </item>
-                  <item row="0" column="4" rowspan="4" colspan="2">
-                   <widget class="QLabel" name="lbl_adjcost_desc">
+                  <item row="1" column="1">
+                   <widget class="QSpinBox" name="amt_coal">
                     <property name="sizePolicy">
-                     <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                       <horstretch>0</horstretch>
                       <verstretch>0</verstretch>
                      </sizepolicy>
                     </property>
                     <property name="minimumSize">
                      <size>
-                      <width>180</width>
+                      <width>50</width>
                       <height>0</height>
                      </size>
                     </property>
-                    <property name="maximumSize">
-                     <size>
-                      <width>500</width>
-                      <height>16777215</height>
-                     </size>
+                    <property name="maximum">
+                     <number>10000</number>
                     </property>
-                    <property name="frameShape">
-                     <enum>QFrame::NoFrame</enum>
+                    <property name="singleStep">
+                     <number>10</number>
                     </property>
-                    <property name="frameShadow">
-                     <enum>QFrame::Sunken</enum>
+                    <property name="stepType">
+                     <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
                     </property>
-                    <property name="text">
-                     <string>These inputs are used to configure the &quot;Adjusted Cost&quot; values assigned to each token type, which is the reciprocal of the token budget divided by the reciprocal of the &quot;money&quot; token value, such that the normalized value of a money token is always 1. The calculated value is displayed underneath each box.</string>
-                    </property>
-                    <property name="alignment">
-                     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-                    </property>
-                    <property name="wordWrap">
-                     <bool>true</bool>
+                    <property name="value">
+                     <number>500</number>
                     </property>
                    </widget>
                   </item>
-                  <item row="3" column="0">
-                   <widget class="QLabel" name="lbl_electric">
+                  <item row="3" column="1">
+                   <widget class="QSpinBox" name="amt_electric">
                     <property name="sizePolicy">
                      <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>50</width>
+                      <height>0</height>
+                     </size>
+                    </property>
+                    <property name="maximum">
+                     <number>10000</number>
+                    </property>
+                    <property name="singleStep">
+                     <number>10</number>
+                    </property>
+                    <property name="stepType">
+                     <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+                    </property>
+                    <property name="value">
+                     <number>250</number>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="3" rowspan="4">
+                   <widget class="Line" name="line">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
                       <horstretch>0</horstretch>
                       <verstretch>0</verstretch>
                      </sizepolicy>
@@ -909,11 +702,218 @@
                       <height>0</height>
                      </size>
                     </property>
+                    <property name="orientation">
+                     <enum>Qt::Vertical</enum>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="1" column="2">
+                   <widget class="QLabel" name="lbl_adj_coal">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>30</width>
+                      <height>0</height>
+                     </size>
+                    </property>
                     <property name="text">
-                     <string>Electricity</string>
+                     <string notr="true">10.00</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>amt_coal</cstring>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="3" column="2">
+                   <widget class="QLabel" name="lbl_adj_electric">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>30</width>
+                      <height>0</height>
+                     </size>
+                    </property>
+                    <property name="text">
+                     <string notr="true">10.00</string>
                     </property>
                     <property name="buddy">
                      <cstring>amt_electric</cstring>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="2" column="1">
+                   <widget class="QSpinBox" name="amt_diesel">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>50</width>
+                      <height>0</height>
+                     </size>
+                    </property>
+                    <property name="maximum">
+                     <number>10000</number>
+                    </property>
+                    <property name="singleStep">
+                     <number>10</number>
+                    </property>
+                    <property name="stepType">
+                     <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+                    </property>
+                    <property name="value">
+                     <number>500</number>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item row="0" column="0">
+                <widget class="QGroupBox" name="groupBox_display">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Fixed" vsizetype="MinimumExpanding">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>0</width>
+                   <height>0</height>
+                  </size>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>16777215</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="title">
+                  <string notr="true">Display configuration</string>
+                 </property>
+                 <property name="alignment">
+                  <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+                 </property>
+                 <property name="flat">
+                  <bool>true</bool>
+                 </property>
+                 <property name="checkable">
+                  <bool>false</bool>
+                 </property>
+                 <layout class="QGridLayout" name="gridLayout_10">
+                  <item row="1" column="1">
+                   <widget class="QComboBox" name="sel_cmap">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>60</width>
+                      <height>0</height>
+                     </size>
+                    </property>
+                    <item>
+                     <property name="text">
+                      <string notr="true">None</string>
+                     </property>
+                    </item>
+                   </widget>
+                  </item>
+                  <item row="0" column="1">
+                   <widget class="QComboBox" name="sel_unit">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>60</width>
+                      <height>0</height>
+                     </size>
+                    </property>
+                    <item>
+                     <property name="text">
+                      <string notr="true">kmph</string>
+                     </property>
+                    </item>
+                    <item>
+                     <property name="text">
+                      <string notr="true">mph</string>
+                     </property>
+                    </item>
+                   </widget>
+                  </item>
+                  <item row="1" column="0">
+                   <widget class="QLabel" name="lbl_cmap">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="text">
+                     <string notr="true">Colormap</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>sel_cmap</cstring>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="0">
+                   <widget class="QLabel" name="lbl_unit">
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="text">
+                     <string notr="true">Speed unit</string>
+                    </property>
+                    <property name="buddy">
+                     <cstring>sel_unit</cstring>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="2" column="0" colspan="2">
+                   <widget class="QCheckBox" name="sel_cmap_inv">
+                    <property name="enabled">
+                     <bool>false</bool>
+                    </property>
+                    <property name="sizePolicy">
+                     <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                     </sizepolicy>
+                    </property>
+                    <property name="text">
+                     <string notr="true">Reverse direction</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="3" column="0" colspan="2">
+                   <widget class="QPushButton" name="btn_reload_cmaps">
+                    <property name="text">
+                     <string notr="true">&amp;Reload cmaps</string>
                     </property>
                    </widget>
                   </item>
@@ -932,7 +932,7 @@
                </sizepolicy>
               </property>
               <property name="title">
-               <string>Files</string>
+               <string notr="true">Files</string>
               </property>
               <property name="flat">
                <bool>true</bool>
@@ -941,7 +941,7 @@
                <item row="1" column="0">
                 <widget class="QLabel" name="lbl_vfiles">
                  <property name="text">
-                  <string>Vanilla files</string>
+                  <string notr="true">Vanilla files</string>
                  </property>
                  <property name="buddy">
                   <cstring>txt_vfiles</cstring>
@@ -950,6 +950,9 @@
                </item>
                <item row="1" column="1">
                 <widget class="QLineEdit" name="txt_vfiles">
+                 <property name="text">
+                  <string notr="true"/>
+                 </property>
                  <property name="readOnly">
                   <bool>true</bool>
                  </property>
@@ -958,7 +961,7 @@
                <item row="3" column="0">
                 <widget class="QLabel" name="lbl_moddir">
                  <property name="text">
-                  <string>Mod dirs</string>
+                  <string notr="true">Mod dirs</string>
                  </property>
                  <property name="buddy">
                   <cstring>txt_moddir</cstring>
@@ -967,6 +970,9 @@
                </item>
                <item row="0" column="1">
                 <widget class="QLineEdit" name="txt_vdir">
+                 <property name="text">
+                  <string notr="true"/>
+                 </property>
                  <property name="readOnly">
                   <bool>true</bool>
                  </property>
@@ -975,7 +981,7 @@
                <item row="6" column="0">
                 <widget class="QLabel" name="lbl_others">
                  <property name="text">
-                  <string>Mod files</string>
+                  <string notr="true">Mod files</string>
                  </property>
                  <property name="buddy">
                   <cstring>txt_modfiles</cstring>
@@ -985,7 +991,7 @@
                <item row="0" column="0">
                 <widget class="QLabel" name="lbl_vdir">
                  <property name="text">
-                  <string>Vanilla dirs</string>
+                  <string notr="true">Vanilla dirs</string>
                  </property>
                  <property name="buddy">
                   <cstring>txt_vdir</cstring>
@@ -1001,7 +1007,7 @@
                   </sizepolicy>
                  </property>
                  <property name="toolTip">
-                  <string>All found mod .xml files</string>
+                  <string notr="true">All found mod .xml files</string>
                  </property>
                  <property name="tabChangesFocus">
                   <bool>true</bool>
@@ -1009,10 +1015,16 @@
                  <property name="readOnly">
                   <bool>true</bool>
                  </property>
+                 <property name="plainText">
+                  <string notr="true"/>
+                 </property>
                 </widget>
                </item>
                <item row="6" column="1">
                 <widget class="QLineEdit" name="txt_modfiles">
+                 <property name="text">
+                  <string notr="true"/>
+                 </property>
                  <property name="readOnly">
                   <bool>true</bool>
                  </property>
@@ -1020,6 +1032,9 @@
                </item>
                <item row="3" column="1">
                 <widget class="QLineEdit" name="txt_moddir">
+                 <property name="text">
+                  <string notr="true"/>
+                 </property>
                  <property name="readOnly">
                   <bool>true</bool>
                  </property>
@@ -1046,13 +1061,16 @@
                   </size>
                  </property>
                  <property name="toolTip">
-                  <string>All found vanilla .xml files</string>
+                  <string notr="true">All found vanilla .xml files</string>
                  </property>
                  <property name="tabChangesFocus">
                   <bool>true</bool>
                  </property>
                  <property name="readOnly">
                   <bool>true</bool>
+                 </property>
+                 <property name="plainText">
+                  <string notr="true"/>
                  </property>
                 </widget>
                </item>
@@ -1100,7 +1118,7 @@
           </sizepolicy>
          </property>
          <property name="text">
-          <string>Search</string>
+          <string notr="true">Search</string>
          </property>
          <property name="buddy">
           <cstring>lineEdit_search</cstring>
@@ -1109,6 +1127,9 @@
        </item>
        <item row="0" column="1">
         <widget class="QLineEdit" name="lineEdit_search">
+         <property name="text">
+          <string notr="true"/>
+         </property>
          <property name="clearButtonEnabled">
           <bool>true</bool>
          </property>
@@ -1143,7 +1164,7 @@
    </property>
    <widget class="QMenu" name="menuFiles">
     <property name="title">
-     <string>&amp;File</string>
+     <string notr="true">&amp;File</string>
     </property>
     <addaction name="actionOpen"/>
     <addaction name="actionMods"/>
@@ -1154,7 +1175,7 @@
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
-     <string>&amp;Edit</string>
+     <string notr="true">&amp;Edit</string>
     </property>
     <addaction name="actionCopy"/>
     <addaction name="separator"/>
@@ -1177,10 +1198,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Open Files...</string>
+    <string notr="true">Open Files...</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+O</string>
+    <string notr="true">Ctrl+O</string>
    </property>
   </action>
   <action name="actionQuit">
@@ -1189,10 +1210,10 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Quit</string>
+    <string notr="true">Quit</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+W</string>
+    <string notr="true">Ctrl+W</string>
    </property>
   </action>
   <action name="actionMods">
@@ -1200,15 +1221,15 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Open Mods Folder...</string>
+    <string notr="true">Open Mods Folder...</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+M</string>
+    <string notr="true">Ctrl+M</string>
    </property>
   </action>
   <action name="actionHelp">
    <property name="text">
-    <string>Help</string>
+    <string notr="true">Help</string>
    </property>
   </action>
   <action name="actionCopy">
@@ -1216,10 +1237,10 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Copy</string>
+    <string notr="true">Copy</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+C</string>
+    <string notr="true">Ctrl+C</string>
    </property>
   </action>
   <action name="actionSelect_All">
@@ -1227,18 +1248,18 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Select All</string>
+    <string notr="true">Select All</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+A</string>
+    <string notr="true">Ctrl+A</string>
    </property>
   </action>
   <action name="actionReload">
    <property name="text">
-    <string>Reload data</string>
+    <string notr="true">Reload data</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+R</string>
+    <string notr="true">Ctrl+R</string>
    </property>
   </action>
  </widget>
